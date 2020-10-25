@@ -1,6 +1,7 @@
 """Test the environment module."""
 
 from tqdm import tqdm
+import imageio
 import numpy as np
 import tensorflow as tf
 from tf_agents.environments import utils, tf_py_environment
@@ -49,7 +50,7 @@ def test_py_environment_with_random(num_episodes=1000):
   print('proportion of successes', sum(successes) / num_episodes)
 
 
-def test_tf_environment_with_random(num_episodes=1000):
+def test_tf_environment_with_random(num_episodes=200):
   """Test tf environment through random actions."""
   print(f'Testing tf environment with {num_episodes} episodes.')
   env = LakeMonsterEnvironment()
@@ -68,7 +69,7 @@ def test_tf_environment_with_random(num_episodes=1000):
   assert env.action_spec().is_compatible_with(action)
   try:
     env.step(action)
-  except:
+  except ValueError:
     print("tf expects action to have shape (1, 2)")
 
   env.reset()
@@ -92,7 +93,20 @@ def test_tf_environment_with_random(num_episodes=1000):
   print('average reward per episode', np.mean(rewards))
 
 
+def render_py_environment():
+  """Create py environment video through render method."""
+  print('Creating video from render method ...')
+  env = LakeMonsterEnvironment()
+  with imageio.get_writer('test_vid.mp4', fps=30) as video:
+    time_step = env.reset()
+    while not time_step.is_last():
+      action = np.random.uniform(low=-1.0, high=1.0, size=(2,))
+      time_step = env.step(action)
+      video.append_data(env.render())
+
+
 if __name__ == '__main__':
   validate_environment()
   test_py_environment_with_random()
   test_tf_environment_with_random()
+  render_py_environment()

@@ -2,6 +2,7 @@
 
 
 import numpy as np
+from PIL import Image, ImageDraw
 from tf_agents.environments import py_environment
 from tf_agents.specs import array_spec
 from tf_agents.trajectories import time_step as ts
@@ -22,14 +23,15 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     self.step_size = 0.035
 
     # building the rotation matrix
-    theta = self.step_size * self.monster_speed
-    c, s = np.cos(theta), np.sin(theta)
+    self.monster_arc = self.step_size * self.monster_speed
+    c, s = np.cos(self.monster_arc), np.sin(self.monster_arc)
     self.ccw_rot_matrix = np.array(((c, -s), (s, c)))
     self.cw_rot_matrix = np.array(((c, s), (-s, c)))
 
     self.num_steps = 0
     self.max_steps = 1000
     self.position = np.array((0.0, 0.0), dtype=np.float32)
+    self.monster_angle = 0.0  # only used in render method
 
     self._action_spec = array_spec.BoundedArraySpec(
         shape=(2,), dtype=np.float32, name='action')
@@ -61,17 +63,24 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
 
   def rotate(self):
     """Update the position to reflect monster movement."""
-    if self.position[1] > 0:
-      rotated = np.dot(self.cw_rot_matrix, self.position)
-    elif self.position[1] < 0:
-      rotated = np.dot(self.ccw_rot_matrix, self.position)
-    else:
-      rotated = self.position
+    y_sign = np.sign(self.position[1])
 
-    # in case we rotate past the positive y-axis, we need to adjust
-    if np.sign(self.position[1]) != np.sign(rotated[1]):
-      self.position = np.array((self.r, 0.0))
-    else:
+    if y_sign == 1.0:
+      rotated = np.dot(self.cw_rot_matrix, self.position)
+      if rotated[1] < 0:
+        rotated = np.array((self.r, 0.0))
+        self.monster_angle -= np.arctan2(self.position[1], self.position[0])
+      else:
+        self.monster_angle += self.monster_arc
+      self.position = rotated
+
+    elif y_sign == -1.0:
+      rotated = np.dot(self.ccw_rot_matrix, self.position)
+      if rotated[1] > 0:
+        rotated = np.array((self.r, 0.0))
+        self.monster_angle -= np.arctan2(self.position[1], self.position[0])
+      else:
+        self.monster_angle -= self.monster_arc
       self.position = rotated
 
   def _step(self, action):
@@ -103,5 +112,34 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     # still swimming
     return ts.transition(self._state, reward=0)
 
-  def render(self):
-    pass
+  def render(self, mode='rgb_array'):
+    SIZE = 480
+    CENTER = SIZE // 2
+    RADIUS = 200
+    c, s = np.cos(self.monster_angle), np.sin(self.monster_angle)
+    rot_matrix = np.array(((c, -s), (s, c)))
+    real_position = np.dot(rot_matrix, self.position)
+
+    im = Image.new('RGB', (480, 480), (237, 201, 175))
+    draw = ImageDraw.Draw(im)
+
+    def coords_to_rect(coords):
+      x, y = coords
+      y *= -1
+      x, y = CENTER + RADIUS * x, CENTER + RADIUS * y
+      return x - 8, y - 8, x + 8, y + 8
+
+    def angle_to_rect(angle):
+      x, y = np.cos(angle), np.sin(angle)
+      return coords_to_rect((x, y))
+
+    draw.ellipse((CENTER - RADIUS,) * 2 + (CENTER + RADIUS,) * 2,
+                 fill=(0, 0, 255), outline=(0, 0, 0), width=4)
+    draw.ellipse((CENTER - 2,) * 2 + (CENTER + 2,) * 2, fill=(0, 0, 0))
+
+    draw.rectangle(coords_to_rect(real_position), fill=(250, 50, 0))
+    draw.rectangle(angle_to_rect(self.monster_angle), fill=(40, 200, 40))
+
+    if mode == 'rgb_array':
+      return np.array(im)
+    im.show()
