@@ -1,4 +1,5 @@
-"""A tf-agent environment and tests for the lake monster problem."""
+"""A tf-agent environment for the lake monster problem."""
+
 
 import numpy as np
 from tf_agents.environments import py_environment
@@ -15,20 +16,31 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
   well as the player's x, y, and r coordinates."""
 
   def __init__(self):
-    self.monster_speed = 2.0
-    self.step_size = 1e-2
+    super().__init__()
+
+    self.monster_speed = 0.75
+    self.step_size = 0.035
+
+    # building the rotation matrix
+    theta = self.step_size * self.monster_speed
+    c, s = np.cos(theta), np.sin(theta)
+    self.ccw_rot_matrix = np.array(((c, -s), (s, c)))
+    self.cw_rot_matrix = np.array(((c, s), (-s, c)))
+
     self.num_steps = 0
-    self.position = np.array([0, 0], dtype=np.float32)
+    self.max_steps = 1000
+    self.position = np.array((0.0, 0.0), dtype=np.float32)
 
     self._action_spec = array_spec.BoundedArraySpec(
-        shape=(2,), dtype=np.float32, minimum=-1, maximum=1, name='action')
+        shape=(2,), dtype=np.float32, name='action')
     self._observation_spec = array_spec.BoundedArraySpec(
-        shape=(4,), dtype=np.float32, name='observation')
+        shape=(5,), dtype=np.float32, minimum=-10, maximum=10, name='observation')
     self._episode_ended = False
 
   @property
   def _state(self):
-    return np.array([self.monster_speed, self.x, self.y, self.r])
+    return np.array((self.num_steps / self.max_steps, self.monster_speed,
+                     *self.position, self.r), dtype=np.float32)
 
   @property
   def r(self):
@@ -43,36 +55,53 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
 
   def _reset(self):
     self._episode_ended = False
-    self.position = np.array([0, 0], dtype=np.float32)
+    self.position = np.array((0.0, 0.0), dtype=np.float32)
     self.num_steps = 0
-    return ts.restart(np.array([self._state], dtype=np.float32))
+    return ts.restart(self._state)
 
   def rotate(self):
     """Update the position to reflect monster movement."""
+    if self.position[1] > 0:
+      rotated = np.dot(self.cw_rot_matrix, self.position)
+    elif self.position[1] < 0:
+      rotated = np.dot(self.ccw_rot_matrix, self.position)
+    else:
+      rotated = self.position
+
+    # in case we rotate past the positive y-axis, we need to adjust
+    if np.sign(self.position[1]) != np.sign(rotated[1]):
+      self.position = np.array((self.r, 0.0))
+    else:
+      self.position = rotated
 
   def _step(self, action):
-
     if self._episode_ended:
-      # The last action ended the episode. Ignore the current action and start
-      # a new episode.
+      # previous action ended the episode so we ignore current action and reset
       return self.reset()
 
-    # Make sure episodes don't go on forever.
     # scaling action to step_size
-    action /= np.linalg.norm(action)
+    action = action / np.linalg.norm(action)
     action *= self.step_size
     self.position += action
+    self.rotate()
+    self.num_steps += 1
+
+    # forcing episode to end if taking too long
+    if self.num_steps >= self.max_steps:
+      self._episode_ended = True
+      return ts.termination(self._state, reward=-1)
+
+    # made it out of the lake
     if self.r > 1.0:
       self._episode_ended = True
+      if self.position[1] == 0.0 and self.position[0] > 0:
+        reward = -1
+      else:
+        reward = 1
+      return ts.termination(self._state, reward=reward)
 
-    # forcing episode to close if taken over 1000 steps
-    self.num_steps += 1
-    if self.num_steps >= 1000:
-      self._episode_ended = True
+    # still swimming
+    return ts.transition(self._state, reward=0)
 
-    if self._episode_ended or self._state >= 21:
-      reward = self._state - 21 if self._state <= 21 else -21
-      return ts.termination(np.array([self._state], dtype=np.int32), reward)
-    else:
-      return ts.transition(
-          np.array([self._state], dtype=np.int32), reward=0.0, discount=1.0)
+  def render(self):
+    pass
