@@ -5,6 +5,7 @@ from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
 from tf_agents.environments import utils, tf_py_environment
+from tf_agents.policies import random_py_policy
 from environment import LakeMonsterEnvironment
 from renderer import episode_as_video
 
@@ -87,7 +88,9 @@ def test_tf_environment_with_random(num_episodes=200):
 def test_video():
   """Run an episode and save video to file."""
   env = LakeMonsterEnvironment()
-  episode_as_video(env)
+  policy = random_py_policy.RandomPyPolicy(time_step_spec=None,
+                                           action_spec=env.action_spec())
+  episode_as_video(py_env=env, policy=policy, filename='test_vid.mp4')
 
 
 if __name__ == '__main__':

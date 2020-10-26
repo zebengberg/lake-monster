@@ -37,8 +37,6 @@ def renderer(monster_angle, position, prev_action_vector):
   c, s = np.cos(monster_angle), np.sin(monster_angle)
   rot_matrix = np.array(((c, -s), (s, c)))
   real_position = np.dot(rot_matrix, position)
-  real_vector = np.dot(rot_matrix, prev_action_vector)
-  real_vector = real_vector / np.linalg.norm(real_vector)
 
   im = Image.new('RGB', (480, 480), (237, 201, 175))
   draw = ImageDraw.Draw(im)
@@ -49,20 +47,28 @@ def renderer(monster_angle, position, prev_action_vector):
 
   draw.rectangle(coords_to_rect(real_position), fill=(250, 50, 0))
   draw.rectangle(angle_to_rect(monster_angle), fill=(40, 200, 40))
-  draw.line(vector_to_rect(real_vector), fill=(255, 255, 0), width=4)
+
+  if prev_action_vector is not None:
+    real_vector = np.dot(rot_matrix, prev_action_vector)
+    real_vector = real_vector / np.linalg.norm(real_vector)
+    draw.line(vector_to_rect(real_vector), fill=(255, 255, 0), width=4)
 
   return im
 
 
-# TODO: filepath arg, policy arg
-def episode_as_video(env):
+# TODO: show success, capture, timeout
+def episode_as_video(py_env, policy, filename, tf_env=None):
   """Create py environment video through render method."""
   print('Creating video from render method ...')
 
-  with imageio.get_writer('test_vid.mp4', fps=30) as video:
-    time_step = env.reset()
+  if tf_env is None:
+    tf_env = py_env
+
+  with imageio.get_writer(filename, fps=30) as video:
+    time_step = tf_env.reset()
+    video.append_data(py_env.render())
     while not time_step.is_last():
-      action = np.random.uniform(low=0, high=2*np.pi)
-      time_step = env.step(action)
-      video.append_data(env.render())
+      action = policy.action(time_step).action
+      time_step = tf_env.step(action)
+      video.append_data(py_env.render())
     print(time_step.reward)
