@@ -1,11 +1,12 @@
 """Test the environment module."""
 
+
 from tqdm import tqdm
-import imageio
 import numpy as np
 import tensorflow as tf
 from tf_agents.environments import utils, tf_py_environment
 from environment import LakeMonsterEnvironment
+from renderer import episode_as_video
 
 
 def validate_environment():
@@ -29,7 +30,7 @@ def test_py_environment_with_random(num_episodes=1000):
 
   for _ in tqdm(range(num_episodes)):
     while not time_step.is_last():
-      action = np.random.uniform(low=-1.0, high=1.0, size=(2,))
+      action = np.random.uniform(low=0, high=2*np.pi)
       time_step = env.step(action)
 
     reward = time_step.reward
@@ -58,19 +59,9 @@ def test_tf_environment_with_random(num_episodes=200):
   env = tf_py_environment.TFPyEnvironment(env)
   time_step = env.reset()
 
-  # checking action compatibility with env
-
-  # work around for multidimensional action spec in tf environment wrap
-  # batch_size is expected to be the first index of shape
-  # see https://github.com/tensorflow/agents/issues/65
-  # tf claims compatibility here, but fails when calling env.step(action)
   assert env.batch_size == 1
-  action = tf.random.uniform(shape=(2,), minval=-1, maxval=1)
+  action = tf.random.uniform(minval=0, maxval=2*np.math.pi, shape=())
   assert env.action_spec().is_compatible_with(action)
-  try:
-    env.step(action)
-  except ValueError:
-    print("tf expects action to have shape (1, 2)")
 
   env.reset()
   rewards = []
@@ -79,7 +70,7 @@ def test_tf_environment_with_random(num_episodes=200):
   for _ in tqdm(range(num_episodes)):
     num_step = 0
     while not time_step.is_last():
-      action = tf.random.uniform(shape=(1, 2), minval=-1, maxval=1)
+      action = tf.random.uniform(minval=0, maxval=2*np.math.pi, shape=())
       time_step = env.step(action)
       num_step += 1
 
@@ -93,20 +84,14 @@ def test_tf_environment_with_random(num_episodes=200):
   print('average reward per episode', np.mean(rewards))
 
 
-def render_py_environment():
-  """Create py environment video through render method."""
-  print('Creating video from render method ...')
+def test_video():
+  """Run an episode and save video to file."""
   env = LakeMonsterEnvironment()
-  with imageio.get_writer('test_vid.mp4', fps=30) as video:
-    time_step = env.reset()
-    while not time_step.is_last():
-      action = np.random.uniform(low=-1.0, high=1.0, size=(2,))
-      time_step = env.step(action)
-      video.append_data(env.render())
+  episode_as_video(env)
 
 
 if __name__ == '__main__':
-  validate_environment()
-  test_py_environment_with_random()
-  test_tf_environment_with_random()
-  render_py_environment()
+  # validate_environment()
+  # test_py_environment_with_random()
+  # test_tf_environment_with_random()
+  test_video()

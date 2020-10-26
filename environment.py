@@ -2,10 +2,10 @@
 
 
 import numpy as np
-from PIL import Image, ImageDraw
 from tf_agents.environments import py_environment
 from tf_agents.specs import array_spec
 from tf_agents.trajectories import time_step as ts
+from renderer import renderer
 
 
 class LakeMonsterEnvironment(py_environment.PyEnvironment):
@@ -14,7 +14,11 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
   swim inside of the unit disk. After an action takes place, the player is
   rotated within the unit disk to simulate the monster traversing the lake
   shore. An observation of the environment consists of the monster's speed as
-  well as the player's x, y, and r coordinates."""
+  well as the player's x, y, and r coordinates. Because of limits in tf's DQN
+  agent, the action must be one-dimensional (instead of a possibly more natural
+  dx, dy). See https://stats.stackexchange.com/questions/218407/ and
+  https://github.com/tensorflow/agents/issues/97
+  """
 
   def __init__(self):
     super().__init__()
@@ -31,23 +35,30 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     self.num_steps = 0
     self.max_steps = 1000
     self.position = np.array((0.0, 0.0), dtype=np.float32)
+
     self.monster_angle = 0.0  # only used in render method
+    self.prev_action_vector = None  # only used in render method
 
     self._action_spec = array_spec.BoundedArraySpec(
-        shape=(2,), dtype=np.float32, name='action')
+        shape=(), dtype=np.float32, minimum=0, maximum=2*np.pi, name='action')
     self._observation_spec = array_spec.BoundedArraySpec(
-        shape=(5,), dtype=np.float32, minimum=-10, maximum=10, name='observation')
+        shape=(6,), dtype=np.float32, minimum=-10, maximum=10, name='observation')
     self._episode_ended = False
 
   @property
   def _state(self):
     return np.array((self.num_steps / self.max_steps, self.monster_speed,
-                     *self.position, self.r), dtype=np.float32)
+                     *self.position, self.r, self.theta), dtype=np.float32)
 
   @property
   def r(self):
     """Return the radius of the player."""
     return np.linalg.norm(self.position)
+
+  @property
+  def theta(self):
+    """Return the angle of the player."""
+    return np.arctan2(self.position[1], self.position[0])
 
   def action_spec(self):
     return self._action_spec
@@ -88,10 +99,9 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
       # previous action ended the episode so we ignore current action and reset
       return self.reset()
 
-    # scaling action to step_size
-    action = action / np.linalg.norm(action)
-    action *= self.step_size
-    self.position += action
+    action_vector = self.step_size * np.array((np.cos(action), np.sin(action)))
+    self.prev_action_vector = action_vector
+    self.position += action_vector
     self.rotate()
     self.num_steps += 1
 
@@ -113,33 +123,8 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     return ts.transition(self._state, reward=0)
 
   def render(self, mode='rgb_array'):
-    SIZE = 480
-    CENTER = SIZE // 2
-    RADIUS = 200
-    c, s = np.cos(self.monster_angle), np.sin(self.monster_angle)
-    rot_matrix = np.array(((c, -s), (s, c)))
-    real_position = np.dot(rot_matrix, self.position)
-
-    im = Image.new('RGB', (480, 480), (237, 201, 175))
-    draw = ImageDraw.Draw(im)
-
-    def coords_to_rect(coords):
-      x, y = coords
-      y *= -1
-      x, y = CENTER + RADIUS * x, CENTER + RADIUS * y
-      return x - 8, y - 8, x + 8, y + 8
-
-    def angle_to_rect(angle):
-      x, y = np.cos(angle), np.sin(angle)
-      return coords_to_rect((x, y))
-
-    draw.ellipse((CENTER - RADIUS,) * 2 + (CENTER + RADIUS,) * 2,
-                 fill=(0, 0, 255), outline=(0, 0, 0), width=4)
-    draw.ellipse((CENTER - 2,) * 2 + (CENTER + 2,) * 2, fill=(0, 0, 0))
-
-    draw.rectangle(coords_to_rect(real_position), fill=(250, 50, 0))
-    draw.rectangle(angle_to_rect(self.monster_angle), fill=(40, 200, 40))
-
+    im = renderer(self.monster_angle, self.position, self.prev_action_vector)
     if mode == 'rgb_array':
       return np.array(im)
     im.show()
+    return None
