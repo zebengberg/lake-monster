@@ -31,7 +31,24 @@ def vector_to_rect(vector):
   return u - x, v - y, u + x, v + y
 
 
-def renderer(monster_angle, position, prev_action_vector):
+def arrow_segments(vector):
+  """Return arrow segments representing last movement."""
+  # body of the arrow
+  x, y = 40 * vector
+  u, v = CENTER - RADIUS + 10, CENTER - RADIUS + 10
+  lines = [(u - x, v - y, u + x, v + y)]
+
+  # head of the arrow
+  c, s = np.cos(0.65), np.sin(0.65)
+  rot_matrix = np.array(((c, -s), (s, c)))
+  for mat in [rot_matrix, np.linalg.inv(rot_matrix)]:
+    x1, y1 = 10 * np.dot(mat, vector)
+    lines.append((u + x - x1, v + y - y1, u + x, v + y))
+
+  return lines
+
+
+def renderer(monster_angle, position, prev_action_vector, result, monster_speed, step):
   """Render an environment state as a PIL image."""
 
   c, s = np.cos(monster_angle), np.sin(monster_angle)
@@ -48,15 +65,24 @@ def renderer(monster_angle, position, prev_action_vector):
   draw.rectangle(coords_to_rect(real_position), fill=(250, 50, 0))
   draw.rectangle(angle_to_rect(monster_angle), fill=(40, 200, 40))
 
+  monster_text = f'MONSTER SPEED: {monster_speed}'
+  step_text = f'STEP: {step}'
+  draw.text((CENTER - 150, SIZE - 20), monster_text, (0, 0, 0))
+  draw.text((CENTER + 50, SIZE - 20), step_text, (0, 0, 0))
+
   if prev_action_vector is not None:
     real_vector = np.dot(rot_matrix, prev_action_vector)
-    real_vector = real_vector / np.linalg.norm(real_vector)
-    draw.line(vector_to_rect(real_vector), fill=(255, 255, 0), width=4)
+    unit_vector = real_vector / np.linalg.norm(real_vector)
+    lines = arrow_segments(unit_vector)
+    for line in lines:
+      draw.line(line, fill=(255, 255, 0), width=4)
+
+  if result is not None:
+    draw.text((CENTER - 10, CENTER + 30), result.upper(), (255, 255, 255))
 
   return im
 
 
-# TODO: show success, capture, timeout
 def episode_as_video(py_env, policy, filename, tf_env=None):
   """Create py environment video through render method."""
   print('Creating video from render method ...')
@@ -64,11 +90,13 @@ def episode_as_video(py_env, policy, filename, tf_env=None):
   if tf_env is None:
     tf_env = py_env
 
-  with imageio.get_writer(filename, fps=30) as video:
+  fps = 20
+  with imageio.get_writer(filename, fps=fps) as video:
     time_step = tf_env.reset()
     video.append_data(py_env.render())
     while not time_step.is_last():
       action = policy.action(time_step).action
       time_step = tf_env.step(action)
       video.append_data(py_env.render())
-    print(time_step.reward)
+    for _ in range(3 * fps):  # play for 3 more seconds
+      video.append_data(py_env.render())

@@ -18,7 +18,7 @@ def validate_environment():
   print('Test successful.')
 
 
-def test_py_environment_with_random(num_episodes=1000):
+def test_py_environment_with_random(num_episodes=300):
   """Test py environment through random actions."""
   print(f'Testing py environment with {num_episodes} episodes.')
   env = LakeMonsterEnvironment()
@@ -52,7 +52,7 @@ def test_py_environment_with_random(num_episodes=1000):
   print('proportion of successes', sum(successes) / num_episodes)
 
 
-def test_tf_environment_with_random(num_episodes=200):
+def test_tf_environment_with_random(num_episodes=100):
   """Test tf environment through random actions."""
   print(f'Testing tf environment with {num_episodes} episodes.')
   env = LakeMonsterEnvironment()
@@ -94,7 +94,7 @@ def test_video():
 
 
 if __name__ == '__main__':
-  # validate_environment()
-  # test_py_environment_with_random()
-  # test_tf_environment_with_random()
+  validate_environment()
+  test_py_environment_with_random()
+  test_tf_environment_with_random()
   test_video()

@@ -1,5 +1,6 @@
 """A tf-agent policy, driver, replay_buffer, and agent for the monster lake problem."""
 
+import os
 import tensorflow as tf
 from tf_agents.agents.dqn import dqn_agent
 from tf_agents.environments import tf_py_environment
@@ -12,6 +13,10 @@ from tf_agents.trajectories import trajectory
 from environment import LakeMonsterEnvironment
 from renderer import episode_as_video
 
+# supressing some warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+
 
 # hyperparameters
 num_iterations = 50000
@@ -21,7 +26,7 @@ learning_rate = 1e-3
 num_eval_episodes = 10
 eval_interval = 1000
 log_interval = 200
-collect_steps_per_iteration = 1
+collect_steps_per_iteration = 10
 
 # tf environments
 train_py_env = LakeMonsterEnvironment()
@@ -48,9 +53,6 @@ agent.initialize()
 agent.train = common.function(agent.train)
 
 
-episode_as_video(eval_py_env, agent.policy, 'videos/agent.mp4', eval_env)
-
-
 # metrics
 def print_metrics(env, policy, num_episodes=100):
   """Handmade metric to compute return and steps for eval_env."""
@@ -70,9 +72,6 @@ def print_metrics(env, policy, num_episodes=100):
   print('avg_return =', avg_return)
   print('avg_steps =', total_steps / num_episodes)
   return avg_return
-
-
-x = 1/0
 
 
 # data collection
@@ -105,6 +104,7 @@ def collect_data(env, policy, buffer, steps):
 
 # need some initial collection
 collect_data(train_env, agent.policy, replay_buffer, 100)
+episode_as_video(eval_py_env, agent.policy, f'videos/0_steps.mp4', eval_env)
 
 
 # Evaluate the agent's policy once before training.
@@ -126,7 +126,8 @@ for _ in range(num_iterations):
     avg_return = print_metrics(eval_env, agent.policy, num_eval_episodes)
     print('step = {0}: Average Return = {1}'.format(step, avg_return))
     returns.append(avg_return)
-    episode_as_video(eval_py_env, agent.policy, f'videos/{step}.mp4')
+    episode_as_video(eval_py_env, agent.policy,
+                     f'videos/{step}_steps.mp4', eval_env)
 
 
 # num_episodes = tf_metrics.NumberOfEpisodes()

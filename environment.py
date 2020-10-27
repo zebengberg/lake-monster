@@ -20,11 +20,11 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
   https://github.com/tensorflow/agents/issues/97
   """
 
-  def __init__(self):
+  def __init__(self, monster_speed=0.7, step_size=0.05):
     super().__init__()
 
-    self.monster_speed = 0.75
-    self.step_size = 0.035
+    self.monster_speed = monster_speed
+    self.step_size = step_size
 
     # building the rotation matrix
     self.monster_arc = self.step_size * self.monster_speed
@@ -33,7 +33,7 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     self.cw_rot_matrix = np.array(((c, s), (-s, c)))
 
     self.num_steps = 0
-    self.max_steps = 1000
+    self.max_steps = int(20 / step_size)
     self.position = np.array((0.0, 0.0), dtype=np.float32)
 
     self.monster_angle = 0.0  # only used in render method
@@ -111,19 +111,30 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
       return ts.termination(self._state, reward=-1)
 
     # made it out of the lake
-    if self.r > 1.0:
+    if self.r >= 1.0:
       self._episode_ended = True
-      if self.position[1] == 0.0 and self.position[0] > 0:
-        reward = -1
-      else:
-        reward = 1
+      reward, _ = self.determine_reward()
       return ts.termination(self._state, reward=reward)
 
     # still swimming
     return ts.transition(self._state, reward=0)
 
+  def determine_reward(self):
+    """If the episode has ended, return the reward and result."""
+    assert self._episode_ended
+    if self.r >= 1.0:
+      if self.position[1] == 0.0 and self.position[0] > 0:
+        return -1, 'capture'
+      return 1, 'success'
+    return -1, 'timeout'
+
   def render(self, mode='rgb_array'):
-    im = renderer(self.monster_angle, self.position, self.prev_action_vector)
+    # determine if episode just ended
+    result = None
+    if self._episode_ended:
+      _, result = self.determine_reward()
+    im = renderer(self.monster_angle, self.position, self.prev_action_vector,
+                  result, self.monster_speed, self.num_steps)
     if mode == 'rgb_array':
       return np.array(im)
     im.show()
