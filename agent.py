@@ -12,7 +12,7 @@ from environment import LakeMonsterEnvironment
 from renderer import episode_as_video
 from stats import Stats
 
-# supressing some warnings
+# suppressing some warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
@@ -21,7 +21,7 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 replay_buffer_max_length = 100000
 batch_size = 64
 learning_rate = 1e-3
-monster_speed = 1.0
+monster_speed = 1.3
 
 # tf environments
 train_py_env = LakeMonsterEnvironment(monster_speed)
@@ -99,9 +99,9 @@ def evaluate_agent(env, policy):
 
 
 def train_agent():
-  """Train the agent."""
+  """Train the agent until interrupted by user."""
 
-  for _ in range(1000):
+  while True:
     driver.run()  # train a single episode
     experience, _ = next(iterator)
     agent.train(experience)
@@ -114,7 +114,7 @@ def train_agent():
            'n_env_steps': n_steps, 'monster_speed': monster_speed}
       stats.add(d)
 
-    if train_step % 100 == 0:
+    if train_step % 500 == 0:
       print('')
       save_progress()
       print('Progress saved!')

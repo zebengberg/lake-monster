@@ -22,12 +22,22 @@ class Stats:
     """Add a new dictionary to data."""
     self.data.append(d)
 
+  def get_average_reward(self, num_episodes=100):
+    """Return average reward over num_episodes previous episodes."""
+    if len(self.data) < num_episodes:
+      return 0.0
+    rewards = [item['reward'] for item in self.data[-num_episodes:]]
+    return sum(rewards) / num_episodes
+
   def plot(self):
-    """Plot all stats."""
-    df = pd.DataFrame(s.data)
-    df.plot(x='episode', y='reward')
+    """Plot stats."""
+    _, ax = plt.subplots()
+    df = pd.DataFrame(self.data)
+    df.plot(x='episode', y='reward', ax=ax, marker='o', linestyle='')
+    df['rolling_reward'] = df['reward'].rolling(100).mean()
+    df.plot(x='episode', y='rolling_reward', ax=ax, linewidth='4')
     plt.show()
-    # comment code below plots several metrics
+
     # colors = ('indianred', 'teal')
     # metrics = ('reward', 'n_env_steps')
     # fig, org_ax = plt.subplots()

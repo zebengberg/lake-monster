@@ -33,7 +33,7 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     self.cw_rot_matrix = np.array(((c, s), (-s, c)))
 
     self.num_steps = 0
-    self.max_steps = int(10 / step_size)
+    self.max_steps = int(5 / step_size)
     self.position = np.array((0.0, 0.0), dtype=np.float32)
 
     self.monster_angle = 0.0  # only used in render method
