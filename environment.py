@@ -4,7 +4,7 @@
 import numpy as np
 from tf_agents.environments import py_environment
 from tf_agents.specs import array_spec
-from tf_agents.trajectories import time_step as ts
+from tf_agents.trajectories import time_step
 from renderer import renderer
 
 
@@ -33,7 +33,7 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     self.cw_rot_matrix = np.array(((c, s), (-s, c)))
 
     self.num_steps = 0
-    self.max_steps = int(20 / step_size)
+    self.max_steps = int(10 / step_size)
     self.position = np.array((0.0, 0.0), dtype=np.float32)
 
     self.monster_angle = 0.0  # only used in render method
@@ -70,7 +70,7 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     self._episode_ended = False
     self.position = np.array((0.0, 0.0), dtype=np.float32)
     self.num_steps = 0
-    return ts.restart(self._state)
+    return time_step.restart(self._state)
 
   def rotate(self):
     """Update the position to reflect monster movement."""
@@ -108,16 +108,16 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     # forcing episode to end if taking too long
     if self.num_steps >= self.max_steps:
       self._episode_ended = True
-      return ts.termination(self._state, reward=-1)
+      return time_step.termination(self._state, reward=-1)
 
     # made it out of the lake
     if self.r >= 1.0:
       self._episode_ended = True
       reward, _ = self.determine_reward()
-      return ts.termination(self._state, reward=reward)
+      return time_step.termination(self._state, reward=reward)
 
     # still swimming
-    return ts.transition(self._state, reward=0)
+    return time_step.transition(self._state, reward=0)
 
   def determine_reward(self):
     """If the episode has ended, return the reward and result."""

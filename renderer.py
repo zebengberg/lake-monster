@@ -85,7 +85,7 @@ def renderer(monster_angle, position, prev_action_vector, result, monster_speed,
 
 def episode_as_video(py_env, policy, filename, tf_env=None):
   """Create py environment video through render method."""
-  print('Creating video from render method ...')
+  print('Creating video with render method ...')
 
   if tf_env is None:
     tf_env = py_env
@@ -100,3 +100,4 @@ def episode_as_video(py_env, policy, filename, tf_env=None):
       video.append_data(py_env.render())
     for _ in range(3 * fps):  # play for 3 more seconds
       video.append_data(py_env.render())
+  print('Video created.')

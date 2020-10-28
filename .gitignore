@@ -2,4 +2,7 @@
 .vscode
 __pycache__
 
+# saved checkpoints, data, videos
 *.mp4
+*.json
+checkpoints/
