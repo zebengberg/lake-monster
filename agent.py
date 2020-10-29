@@ -175,7 +175,7 @@ class Agent:
           self.reset()
 
       if train_step % 1000 == 0:
-        vid_file = f'videos/episode-{train_step}.mp4'
+        vid_file = f'episode-{train_step}.mp4'
         episode_as_video(self.py_eval_env, self.agent.policy,
                          vid_file, self.tf_eval_env)
 

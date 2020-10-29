@@ -1,5 +1,6 @@
 """Utility functions for rendering an environment and displaying an episode in video."""
 
+import os
 from PIL import Image, ImageDraw
 import imageio
 import numpy as np
@@ -86,6 +87,10 @@ def renderer(monster_angle, position, prev_action_vector, result, monster_speed,
 def episode_as_video(py_env, policy, filename, tf_env=None):
   """Create py environment video through render method."""
   print('Creating video with render method ...')
+
+  if not os.path.exists('videos/'):
+    os.mkdir('videos/')
+  filename = os.path.join('videos/', filename)
 
   if tf_env is None:
     tf_env = py_env
