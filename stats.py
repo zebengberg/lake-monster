@@ -2,10 +2,38 @@
 
 import os
 import json
+import copy
 import matplotlib.pyplot as plt
 import pandas as pd
 
 FILE_NAME = 'stats.json'
+
+
+def jsonify_dict(d):
+  """Cast tuple keys to strings in order to save as json."""
+  jsonified = {}
+  for key in d:
+    if type(key) == tuple:
+      as_list = [str(i) for i in key]
+      as_str = ' '.join(as_list)
+      jsonified[as_str] = d[key]
+    else:
+      jsonified[key] = d[key]
+  return jsonified
+
+
+def dejsonify_dict(d):
+  """Cast string keys to tuples in order to load from json."""
+  dejsonified = {}
+  for key in d:
+    if ' ' in key:  # uses spaces as indicator of python tuple
+      as_list = key.split(' ')
+      as_list = [int(i) for i in as_list]
+      tuple_key = tuple(as_list)
+      dejsonified[tuple_key] = d[key]
+    else:
+      dejsonified[key] = d[key]
+  return dejsonified
 
 
 class Stats:
@@ -13,21 +41,26 @@ class Stats:
 
   def __init__(self):
     if os.path.exists(FILE_NAME):
+      print('Reading agent progress from disk ...')
       with open(FILE_NAME) as f:
-        self.data = json.load(f)
+        data_list = json.load(f)
+        for j in data_list:
+          j['weights'] = dejsonify_dict(j['weights'])
+        self.data = data_list
     else:
+      print('Initializing agent progress for the first time!')
       self.data = []
 
   def add(self, d):
     """Add a new dictionary to data."""
     self.data.append(d)
 
-  def get_average_reward(self, num_episodes=100):
+  def get_recent_average_reward(self, sample_size=100):
     """Return average reward over num_episodes previous episodes."""
-    if len(self.data) < num_episodes:
+    if len(self.data) < sample_size:
       return 0.0
-    rewards = [item['reward'] for item in self.data[-num_episodes:]]
-    return sum(rewards) / num_episodes
+    rewards = [item['reward'] for item in self.data[-sample_size:]]
+    return sum(rewards) / sample_size
 
   def get_last_monster_speed(self):
     """Return last known monster speed."""
@@ -35,22 +68,36 @@ class Stats:
       return self.data[-1]['monster_speed']
     return None
 
-  def plot(self):
-    """Plot stats."""
-    _, ax = plt.subplots()
+  def get_weight_indices(self):
+    """Return the indices of the weights tracked."""
+    if self.data:
+      return list(self.data[-1]['weights'].keys())
+    return None
+
+  def plot_reward(self):
+    """Plot reward over time."""
     df = pd.DataFrame(self.data)
+    _, ax = plt.subplots()
     df.plot(x='episode', y='reward', ax=ax, marker='o', linestyle='')
     df['rolling_reward'] = df['reward'].rolling(100).mean()
     df.plot(x='episode', y='rolling_reward', ax=ax, linewidth='4')
     plt.show()
 
-    # colors = ('indianred', 'teal')
-    # metrics = ('reward', 'n_env_steps')
-    # fig, org_ax = plt.subplots()
-    # axes = [org_ax, org_ax.twinx()]
-    # for ax, color, metric in zip(axes, colors, metrics):
-    #   df.plot(x='episode', y=metric, ax=ax, color=color, legend=False)
-    # plt.show()
+  def plot_weights(self):
+    """Plot weights over time."""
+    weights = [item['weights'] for item in self.data]
+    df = pd.DataFrame(weights)
+
+    # pandas doesn't like tuples as column names
+    df.columns = range(len(df.columns))
+    keys = df.columns
+    df['episode'] = [item['episode'] for item in self.data]
+
+    _, ax = plt.subplots()
+    for k in keys:
+      df.plot(x='episode', y=k, ax=ax)
+    ax.get_legend().remove()
+    plt.show()
 
   def save(self):
     """Save data to disk."""
@@ -62,7 +109,10 @@ class Stats:
 
     # writing data to disk
     with open(FILE_NAME, 'w') as f:
-      json.dump(self.data, f)
+      jsonified = copy.deepcopy(self.data)
+      for j in jsonified:
+        j['weights'] = jsonify_dict(j['weights'])
+      json.dump(jsonified, f)
 
     # cleanup
     if os.path.exists(backup):
@@ -72,4 +122,4 @@ class Stats:
 if __name__ == '__main__':
   # plotting existing stats
   s = Stats()
-  s.plot()
+  s.plot_weights()

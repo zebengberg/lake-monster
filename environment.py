@@ -20,7 +20,7 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
   https://github.com/tensorflow/agents/issues/97
   """
 
-  def __init__(self, monster_speed=0.7, step_size=0.05):
+  def __init__(self, monster_speed=1.0, step_size=0.1):
     super().__init__()
 
     self.monster_speed = monster_speed

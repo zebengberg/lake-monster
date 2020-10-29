@@ -9,6 +9,8 @@ from tf_agents.policies import random_py_policy
 from environment import LakeMonsterEnvironment
 from renderer import episode_as_video
 
+TEST_VIDEO_FILENAME = 'test.mp4'
+
 
 def validate_environment():
   """Test environment using built-in validate tool."""
@@ -90,7 +92,7 @@ def test_video():
   env = LakeMonsterEnvironment()
   policy = random_py_policy.RandomPyPolicy(time_step_spec=None,
                                            action_spec=env.action_spec())
-  episode_as_video(py_env=env, policy=policy, filename='test_vid.mp4')
+  episode_as_video(py_env=env, policy=policy, filename=TEST_VIDEO_FILENAME)
 
 
 if __name__ == '__main__':
