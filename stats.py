@@ -29,6 +29,12 @@ class Stats:
     rewards = [item['reward'] for item in self.data[-num_episodes:]]
     return sum(rewards) / num_episodes
 
+  def get_last_monster_speed(self):
+    """Return last known monster speed."""
+    if self.data:
+      return self.data[-1]['monster_speed']
+    return None
+
   def plot(self):
     """Plot stats."""
     _, ax = plt.subplots()
