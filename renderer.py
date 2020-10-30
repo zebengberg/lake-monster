@@ -3,6 +3,8 @@
 import os
 from PIL import Image, ImageDraw
 import imageio
+# including this import for pipreqs
+import imageio_ffmpeg  # pylint: disable=unused-import
 import numpy as np
 
 

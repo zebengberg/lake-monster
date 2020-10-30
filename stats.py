@@ -5,6 +5,7 @@ import json
 import copy
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
 FILE_NAME = 'stats.json'
 
@@ -55,11 +56,14 @@ class Stats:
     """Add a new dictionary to data."""
     self.data.append(d)
 
-  def get_recent_average_reward(self, sample_size=100):
-    """Return average reward over num_episodes previous episodes."""
+  def get_recent_average_reward(self, monster_speed, sample_size=100):
+    """Return average reward over recent episodes at current monster speed."""
     if len(self.data) < sample_size:
       return 0.0
-    rewards = [item['reward'] for item in self.data[-sample_size:]]
+    rewards = [item['reward'] for item in self.data[-sample_size:]
+               if round(item['monster_speed'], 2) == round(monster_speed, 2)]
+    if len(rewards):
+      return 0.0
     return sum(rewards) / sample_size
 
   def get_last_monster_speed(self):
@@ -74,7 +78,7 @@ class Stats:
       return list(self.data[-1]['weights'].keys())
     return None
 
-  def plot_reward(self):
+  def plot_rewards(self):
     """Plot reward over time."""
     df = pd.DataFrame(self.data)
     _, ax = plt.subplots()
@@ -89,6 +93,8 @@ class Stats:
     df = pd.DataFrame(weights)
 
     # pandas doesn't like tuples as column names
+    env_state_index = [t[0] for t in df.columns]
+
     df.columns = range(len(df.columns))
     keys = df.columns
     df['episode'] = [item['episode'] for item in self.data]
@@ -96,7 +102,20 @@ class Stats:
     _, ax = plt.subplots()
     for k in keys:
       df.plot(x='episode', y=k, ax=ax)
-    ax.get_legend().remove()
+
+    handles, _ = ax.get_legend_handles_labels()
+    ax.legend(handles, env_state_index, title='env state index')
+    plt.show()
+
+  def plot_stats(self):
+    df = pd.DataFrame(self.data)
+    df['rolling_steps'] = df['n_env_steps'].rolling(1000).mean() / 50
+    df['rolling_reward'] = df['reward'].rolling(1000).mean()
+    df['rolling_loss'] = np.log(df['loss'].rolling(1000).mean())
+    _, ax = plt.subplots()
+    df.plot(x='episode', y='rolling_steps', ax=ax)
+    df.plot(x='episode', y='rolling_reward', ax=ax)
+    df.plot(x='episode', y='rolling_loss', ax=ax)
     plt.show()
 
   def save(self):
@@ -122,4 +141,6 @@ class Stats:
 if __name__ == '__main__':
   # plotting existing stats
   s = Stats()
-  s.plot_weights()
+  s.plot_stats()
+  # s.plot_weights()
+  # s.plot_rewards()

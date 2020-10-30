@@ -20,11 +20,14 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
   https://github.com/tensorflow/agents/issues/97
   """
 
-  def __init__(self, monster_speed=1.0, step_size=0.1):
+  timeout_factor = 3
+  step_size = 0.1
+  duration = int(timeout_factor / step_size)
+
+  def __init__(self, monster_speed=1.0):
     super().__init__()
 
     self.monster_speed = monster_speed
-    self.step_size = step_size
 
     # building the rotation matrix
     self.monster_arc = self.step_size * self.monster_speed
@@ -33,7 +36,7 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     self.cw_rot_matrix = np.array(((c, s), (-s, c)))
 
     self.num_steps = 0
-    self.max_steps = int(5 / step_size)
+
     self.position = np.array((0.0, 0.0), dtype=np.float32)
 
     self.monster_angle = 0.0  # only used in render method
@@ -47,13 +50,18 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
 
   @property
   def _state(self):
-    return np.array((self.num_steps / self.max_steps, self.monster_speed,
+    return np.array((self.step_proportion, self.monster_speed,
                      *self.position, self.r, self.theta), dtype=np.float32)
 
   @property
   def r(self):
     """Return the radius of the player."""
     return np.linalg.norm(self.position)
+
+  @property
+  def step_proportion(self):
+    """Return proportion of number of steps taken to number of steps allowed."""
+    return self.num_steps / self.duration
 
   @property
   def theta(self):
@@ -106,7 +114,7 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     self.num_steps += 1
 
     # forcing episode to end if taking too long
-    if self.num_steps >= self.max_steps:
+    if self.step_proportion >= 1:
       self._episode_ended = True
       return time_step.termination(self._state, reward=-1)
 
@@ -116,14 +124,14 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
       reward, _ = self.determine_reward()
       return time_step.termination(self._state, reward=reward)
 
-    # still swimming
-    return time_step.transition(self._state, reward=0)
+    # still swimming; penalizing for taking so long
+    return time_step.transition(self._state, reward=-0.1 * self.step_proportion)
 
   def determine_reward(self):
     """If the episode has ended, return the reward and result."""
     assert self._episode_ended
     if self.r >= 1.0:
-      if self.position[1] == 0.0 and self.position[0] > 0:
+      if round(self.position[1], 4) == 0.0 and self.position[0] > 0:
         return -1, 'capture'
       return 1, 'success'
     return -1, 'timeout'

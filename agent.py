@@ -25,7 +25,7 @@ class Agent:
   batch_size = 64
   learning_rate = 1e-3
   fc_layer_params = (100,)
-  num_actions = 20
+  num_actions = 4
 
   def __init__(self):
     self.stats = Stats()
@@ -168,7 +168,7 @@ class Agent:
         print('')
         self.save_progress()
 
-        if self.stats.get_recent_average_reward() > 0.8:
+        if self.stats.get_recent_average_reward(self.monster_speed) > 0.8:
           self.monster_speed += 0.1
           print('Agent is very strong!')
           print(f'Increasing the monster speed to {self.monster_speed} ...')
@@ -178,8 +178,3 @@ class Agent:
         vid_file = f'episode-{train_step}.mp4'
         episode_as_video(self.py_eval_env, self.agent.policy,
                          vid_file, self.tf_eval_env)
-
-
-if __name__ == '__main__':
-  a = Agent()
-  a.train_ad_infinitum()
