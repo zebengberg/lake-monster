@@ -164,8 +164,8 @@ class Agent:
              'loss': loss, 'weights': self.get_sample_weights()}
         self.stats.add(d)
 
-      if train_step % 200 == 0:
-        print('')
+      if train_step % 400 == 0:
+        print(f'\nCompleted {train_step} episodes.')
         self.save_progress()
 
         if self.stats.get_recent_average_reward(self.monster_speed) > 0.8:
@@ -174,7 +174,7 @@ class Agent:
           print(f'Increasing the monster speed to {self.monster_speed} ...')
           self.reset()
 
-      if train_step % 1000 == 0:
+      if train_step % 2000 == 0:
         vid_file = f'episode-{train_step}.mp4'
         episode_as_video(self.py_eval_env, self.agent.policy,
                          vid_file, self.tf_eval_env)

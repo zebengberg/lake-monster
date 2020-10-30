@@ -57,12 +57,12 @@ class Stats:
     self.data.append(d)
 
   def get_recent_average_reward(self, monster_speed, sample_size=100):
-    """Return average reward over recent episodes at current monster speed."""
+    """Return average reward over recent episodes at monster_speed."""
     if len(self.data) < sample_size:
       return 0.0
     rewards = [item['reward'] for item in self.data[-sample_size:]
                if round(item['monster_speed'], 2) == round(monster_speed, 2)]
-    if len(rewards):
+    if len(rewards) < sample_size:  # not enough recent data
       return 0.0
     return sum(rewards) / sample_size
 
@@ -108,6 +108,7 @@ class Stats:
     plt.show()
 
   def plot_stats(self):
+    """Plot steps, rewards, and loss over time."""
     df = pd.DataFrame(self.data)
     df['rolling_steps'] = df['n_env_steps'].rolling(1000).mean() / 50
     df['rolling_reward'] = df['reward'].rolling(1000).mean()
@@ -142,5 +143,5 @@ if __name__ == '__main__':
   # plotting existing stats
   s = Stats()
   s.plot_stats()
-  # s.plot_weights()
-  # s.plot_rewards()
+  s.plot_weights()
+  s.plot_rewards()
