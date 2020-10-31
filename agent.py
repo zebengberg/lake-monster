@@ -24,14 +24,18 @@ class Agent:
   replay_buffer_max_length = 100000
   batch_size = 64
   learning_rate = 1e-3
-  fc_layer_params = (100,)
-  num_actions = 4
 
-  def __init__(self):
+  def __init__(self, num_actions=4, step_size=0.1, initial_monster_speed=1.0,
+               monster_speed_step=0.1, hidden_layer_nodes=100):
+    self.num_actions = num_actions
+    self.step_size = step_size
+    self.monster_speed_step = monster_speed_step
+    self.fc_layer_params = (hidden_layer_nodes, )
+
     self.stats = Stats()
     self.monster_speed = self.stats.get_last_monster_speed()
     if self.monster_speed is None:
-      self.monster_speed = 1.5  # initial monster speed
+      self.monster_speed = initial_monster_speed
 
     self.tf_train_env, self.py_eval_env, self.tf_eval_env = self.build_envs()
     self.q_net, self.agent = self.build_agent()
@@ -50,11 +54,14 @@ class Agent:
 
   def build_envs(self):
     """Initialize environments based on monster_speed."""
-    py_train_env = LakeMonsterEnvironment(self.monster_speed)
+    params = {'monster_speed': self.monster_speed,
+              'timeout_factor': 5,
+              'step_size': self.step_size}
+    py_train_env = LakeMonsterEnvironment(**params)
     discrete_py_train_env = wrappers.ActionDiscretizeWrapper(
         py_train_env, num_actions=self.num_actions)
     tf_train_env = tf_py_environment.TFPyEnvironment(discrete_py_train_env)
-    py_eval_env = LakeMonsterEnvironment(self.monster_speed)
+    py_eval_env = LakeMonsterEnvironment(**params)
     discrete_py_eval_env = wrappers.ActionDiscretizeWrapper(
         py_eval_env, num_actions=self.num_actions)
     tf_eval_env = tf_py_environment.TFPyEnvironment(discrete_py_eval_env)
@@ -179,7 +186,7 @@ class Agent:
         self.save_progress()
 
         if self.stats.get_recent_average_reward(self.monster_speed) > 0.8:
-          self.monster_speed += 0.1
+          self.monster_speed += self.monster_speed_step
           print('Agent is very strong!')
           print(f'Increasing the monster speed to {self.monster_speed} ...')
           self.reset()
