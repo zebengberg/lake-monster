@@ -1,11 +1,12 @@
 """Utility functions for rendering an environment and displaying an episode in video."""
 
+import numpy as np
 import os
 from PIL import Image, ImageDraw
 import imageio
 # including this import for pipreqs
 import imageio_ffmpeg  # pylint: disable=unused-import
-import numpy as np
+import pygifsicle
 
 
 SIZE = 480
@@ -87,7 +88,7 @@ def renderer(monster_angle, position, prev_action_vector, result, monster_speed,
 
 
 def episode_as_video(py_env, policy, filename, tf_env=None):
-  """Create py environment video through render method."""
+  """Create mp4 video through py_environment render method."""
   print('Creating video with render method ...')
 
   if not os.path.exists('videos/'):
@@ -107,4 +108,16 @@ def episode_as_video(py_env, policy, filename, tf_env=None):
       video.append_data(py_env.render())
     for _ in range(3 * fps):  # play for 3 more seconds
       video.append_data(py_env.render())
-  print('Video created.')
+  print(f'Video created and saved as {filename}')
+
+
+def episode_as_gif(py_env, policy, filepath):
+  """Create gif through py_environment render method."""
+  with imageio.get_writer(filepath, mode='I', fps=30) as gif:
+    time_step = py_env.reset()
+    gif.append_data(py_env.render())
+    while not time_step.is_last():
+      action = policy.action(time_step).action
+      time_step = py_env.step(action)
+      gif.append_data(py_env.render())
+  pygifsicle.optimize(filepath)

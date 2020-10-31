@@ -52,6 +52,9 @@ class Stats:
       print('Initializing agent progress for the first time!')
       self.data = []
 
+    self.df = None
+    self.jumps = None
+
   def add(self, d):
     """Add a new dictionary to data."""
     self.data.append(d)
@@ -78,45 +81,59 @@ class Stats:
       return list(self.data[-1]['weights'].keys())
     return None
 
+  def build_df(self):
+    """Build common dataframe used to plot statistics."""
+    df = pd.DataFrame(self.data)
+    df['rolling_n_env_steps'] = df['n_env_steps'].rolling(1000).mean()
+    df['rolling_n_env_steps'] /= df['n_env_steps'].max()
+    df['rolling_reward'] = df['reward'].rolling(1000).mean()
+    df['rolling_loss'] = np.log(df['loss'].rolling(1000).mean())  # note log
+    self.df = df
+
+    # jumps holds the episode in which the monster's speed has increased
+    jumps = df[df['monster_speed'].diff() > 0.01]['episode']
+    self.jumps = jumps
+
   def plot_rewards(self):
     """Plot reward over time."""
-    df = pd.DataFrame(self.data)
     _, ax = plt.subplots()
-    df.plot(x='episode', y='reward', ax=ax, marker='o', linestyle='')
-    df['rolling_reward'] = df['reward'].rolling(100).mean()
-    df.plot(x='episode', y='rolling_reward', ax=ax, linewidth='4')
+    self.df.plot(x='episode', y='reward', ax=ax, marker='o', linestyle='')
+    self.df.plot(x='episode', y='rolling_reward', ax=ax, linewidth='4')
+    for l in self.jumps:
+      ax.axvline(l, color='gray', alpha=0.5)
     plt.show()
 
   def plot_weights(self):
     """Plot weights over time."""
     weights = [item['weights'] for item in self.data]
-    df = pd.DataFrame(weights)
+    weights = pd.DataFrame(weights)
 
+    env_state_index = [t[0] for t in weights.columns]
     # pandas doesn't like tuples as column names
-    env_state_index = [t[0] for t in df.columns]
+    weights.columns = range(len(weights.columns))
 
-    df.columns = range(len(df.columns))
-    keys = df.columns
-    df['episode'] = [item['episode'] for item in self.data]
+    keys = weights.columns
+    weights['episode'] = [item['episode'] for item in self.data]
 
     _, ax = plt.subplots()
     for k in keys:
-      df.plot(x='episode', y=k, ax=ax)
+      weights.plot(x='episode', y=k, ax=ax)
 
     handles, _ = ax.get_legend_handles_labels()
     ax.legend(handles, env_state_index, title='env state index')
+    for l in self.jumps:
+      ax.axvline(l, color='gray', alpha=0.5)
     plt.show()
 
   def plot_stats(self):
     """Plot steps, rewards, and loss over time."""
-    df = pd.DataFrame(self.data)
-    df['rolling_steps'] = df['n_env_steps'].rolling(1000).mean() / 50
-    df['rolling_reward'] = df['reward'].rolling(1000).mean()
-    df['rolling_loss'] = np.log(df['loss'].rolling(1000).mean())
+
     _, ax = plt.subplots()
-    df.plot(x='episode', y='rolling_steps', ax=ax)
-    df.plot(x='episode', y='rolling_reward', ax=ax)
-    df.plot(x='episode', y='rolling_loss', ax=ax)
+    self.df.plot(x='episode', y='rolling_n_env_steps', ax=ax)
+    self.df.plot(x='episode', y='rolling_reward', ax=ax)
+    self.df.plot(x='episode', y='rolling_loss', ax=ax)
+    for l in self.jumps:
+      ax.axvline(l, color='gray', alpha=0.5)
     plt.show()
 
   def save(self):
@@ -142,6 +159,7 @@ class Stats:
 if __name__ == '__main__':
   # plotting existing stats
   s = Stats()
+  s.build_df()
   s.plot_stats()
   s.plot_weights()
   s.plot_rewards()

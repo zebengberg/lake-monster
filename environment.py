@@ -20,14 +20,13 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
   https://github.com/tensorflow/agents/issues/97
   """
 
-  timeout_factor = 3
-  step_size = 0.1
-  duration = int(timeout_factor / step_size)
-
-  def __init__(self, monster_speed=1.0):
+  def __init__(self, monster_speed=1.0, timeout_factor=3, step_size=0.1):
     super().__init__()
 
     self.monster_speed = monster_speed
+    self.timeout_factor = timeout_factor
+    self.step_size = step_size
+    self.duration = int(timeout_factor / step_size)
 
     # building the rotation matrix
     self.monster_arc = self.step_size * self.monster_speed

@@ -142,10 +142,20 @@ class Agent:
     return {i: weights[i].item() for i in self.weight_indices}
 
   def save_progress(self):
-    """Save train checkpoint and updated stats."""
+    """Save checkpoints and updated stats. Ignore keyboard interruptions."""
+    def save_successfully():
+      self.checkpointer.save(self.agent.train_step_counter)
+      self.stats.save()
+      return True
+
+    is_saved = False
     print('Saving progress to disk ...')
-    self.checkpointer.save(self.agent.train_step_counter)
-    self.stats.save()
+    while not is_saved:
+      try:
+        is_saved = save_successfully()
+      except KeyboardInterrupt:
+        print('Wait to interrupt until after progress has been saved!')
+        continue
     print('Progress saved.')
 
   def train_ad_infinitum(self):

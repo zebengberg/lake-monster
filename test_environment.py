@@ -11,6 +11,13 @@ from renderer import episode_as_video
 
 TEST_VIDEO_FILENAME = 'test.mp4'
 
+# nice environment parameters for testing
+test_monster_speed = 0.7
+test_timeout_factor = 20
+test_step_size = 0.05
+params = {'monster_speed': test_monster_speed,
+          'timeout_factor': test_timeout_factor, 'step_size': test_step_size}
+
 
 def validate_environment():
   """Test environment using built-in validate tool."""
@@ -20,10 +27,10 @@ def validate_environment():
   print('Test successful.')
 
 
-def test_py_environment_with_random(num_episodes=300):
+def test_py_environment_with_random(num_episodes=1000):
   """Test py environment through random actions."""
   print(f'Testing py environment with {num_episodes} episodes.')
-  env = LakeMonsterEnvironment()
+  env = LakeMonsterEnvironment(**params)
   time_step = env.reset()
   rewards = []
   num_steps = []
@@ -57,8 +64,7 @@ def test_py_environment_with_random(num_episodes=300):
 def test_tf_environment_with_random(num_episodes=100):
   """Test tf environment through random actions."""
   print(f'Testing tf environment with {num_episodes} episodes.')
-  env = LakeMonsterEnvironment()
-  # we lose many of the py_environment methods when we wrap it
+  env = LakeMonsterEnvironment(**params)
   env = tf_py_environment.TFPyEnvironment(env)
   time_step = env.reset()
 
@@ -89,14 +95,20 @@ def test_tf_environment_with_random(num_episodes=100):
 
 def test_video():
   """Run an episode and save video to file."""
-  env = LakeMonsterEnvironment()
+  env = LakeMonsterEnvironment(**params)
   policy = random_py_policy.RandomPyPolicy(time_step_spec=None,
                                            action_spec=env.action_spec())
   episode_as_video(py_env=env, policy=policy, filename=TEST_VIDEO_FILENAME)
 
 
 if __name__ == '__main__':
+  print('\n' + '#' * 80)
   validate_environment()
+  print('\n' + '#' * 80)
   test_py_environment_with_random()
+  print('\n' + '#' * 80)
   test_tf_environment_with_random()
+  print('\n' + '#' * 80)
   test_video()
+  print('\n' + '#' * 80)
+  print('All tests pass.')
