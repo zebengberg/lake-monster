@@ -124,7 +124,8 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
       return time_step.termination(self._state, reward=reward)
 
     # still swimming; penalizing for taking so long
-    return time_step.transition(self._state, reward=-0.1 * self.step_proportion)
+    return time_step.transition(self._state, reward=0)
+    # -0.1 * self.step_proportion)
 
   def determine_reward(self):
     """If the episode has ended, return the reward and result."""

@@ -6,6 +6,7 @@ import tensorflow as tf
 from tf_agents.agents.dqn import dqn_agent
 from tf_agents.environments import tf_py_environment, wrappers
 from tf_agents.networks import q_network
+from tf_agents.policies import policy_saver
 from tf_agents.utils import common
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from tf_agents.drivers import dynamic_episode_driver
@@ -26,11 +27,11 @@ class Agent:
   learning_rate = 1e-3
 
   def __init__(self, num_actions=4, step_size=0.1, initial_monster_speed=1.0,
-               monster_speed_step=0.1, hidden_layer_nodes=100):
+               timeout_factor=3, hidden_layer_nodes=100):
     self.num_actions = num_actions
     self.step_size = step_size
-    self.monster_speed_step = monster_speed_step
-    self.fc_layer_params = (hidden_layer_nodes, )
+    self.timeout_factor = timeout_factor
+    self.fc_layer_params = (hidden_layer_nodes,)
 
     self.stats = Stats()
     self.monster_speed = self.stats.get_last_monster_speed()
@@ -55,7 +56,7 @@ class Agent:
   def build_envs(self):
     """Initialize environments based on monster_speed."""
     params = {'monster_speed': self.monster_speed,
-              'timeout_factor': 5,
+              'timeout_factor': self.timeout_factor,
               'step_size': self.step_size}
     py_train_env = LakeMonsterEnvironment(**params)
     discrete_py_train_env = wrappers.ActionDiscretizeWrapper(
@@ -129,8 +130,9 @@ class Agent:
       ts = self.tf_eval_env.step(action.action)
       n_steps += 1
 
+    proportion_steps = n_steps / self.py_eval_env.duration
     reward = ts.reward.numpy()[0].item()  # item converts to native python type
-    return reward, n_steps
+    return reward, proportion_steps
 
   def build_weight_indices(self, num_indices=20):
     """Select or load NN weight indices to be tracked over training."""
@@ -156,42 +158,69 @@ class Agent:
       return True
 
     is_saved = False
+    tried_to_interrupt = False
     print('Saving progress to disk ...')
     while not is_saved:
       try:
         is_saved = save_successfully()
       except KeyboardInterrupt:
-        print('Wait to interrupt until after progress has been saved!')
+        tried_to_interrupt = True
         continue
     print('Progress saved.')
+    if tried_to_interrupt:
+      raise KeyboardInterrupt
 
   def train_ad_infinitum(self):
     """Train the agent until interrupted by user."""
+    print_legend()
     while True:
       self.driver.run()  # train a single episode
       experience, _ = next(self.iterator)
       loss = self.agent.train(experience).loss.numpy().item()
       train_step = self.agent.train_step_counter.numpy().item()
 
-      if train_step % 10 == 0:
-        print('|', end='', flush=True)
+      if train_step % eval_interval == 0:
         reward, n_steps = self.evaluate_agent()
         d = {'episode': train_step, 'reward': reward,
              'n_env_steps': n_steps, 'monster_speed': self.monster_speed,
              'loss': loss, 'weights': self.get_sample_weights()}
         self.stats.add(d)
+        if reward == 1.0:
+          print('$', end='', flush=True)
+        else:
+          print('.', end='', flush=True)
 
-      if train_step % 400 == 0:
+      if train_step % save_interval == 0:
         print(f'\nCompleted {train_step} episodes.')
+        print(f'Current monster speed is {self.monster_speed}.')
         self.save_progress()
 
-        if self.stats.get_recent_average_reward(self.monster_speed) > 0.8:
-          self.monster_speed += self.monster_speed_step
+        if (a := self.stats.get_average_reward(self.monster_speed)) > 0.4:
+          # upping the monster speed in proportion to performance
+          self.monster_speed += 0.1 * a
+          self.monster_speed = round(self.monster_speed, 3)
           print('Agent is very strong!')
           print(f'Increasing the monster speed to {self.monster_speed} ...')
           self.reset()
 
-      if train_step % 2000 == 0:
+      if train_step % video_interval == 0:
         vid_file = f'episode-{train_step}.mp4'
         episode_as_video(self.py_eval_env, self.agent.policy,
                          vid_file, self.tf_eval_env)
+
+
+eval_interval = 10
+save_interval = 200
+video_interval = 2000
+
+
+def print_legend():
+  """Print command line training legend."""
+  print('\n' + '#' * 80)
+  print('          TRAINING LEGEND')
+  print('$ = success on last evaluation episode')
+  print('. = failure on last evaluation episode')
+  print(f'Evaluation occurs every {eval_interval} episodes')
+  print(f'Progress is saved every {save_interval} episodes')
+  print(f'Videos are rendered and saved every {video_interval} episodes')
+  print('#' * 80 + '\n')

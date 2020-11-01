@@ -2,10 +2,10 @@
 
 from agent import Agent
 
-params = {'num_actions': 8,
+params = {'num_actions': 6,
           'step_size': 0.05,
-          'initial_monster_speed': 2.0,
-          'monster_speed_step': 0.05,
+          'initial_monster_speed': 1.5,
+          'timeout_factor': 3,
           'hidden_layer_nodes': 100}
 
 a = Agent(**params)

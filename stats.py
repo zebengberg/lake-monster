@@ -59,15 +59,13 @@ class Stats:
     """Add a new dictionary to data."""
     self.data.append(d)
 
-  def get_recent_average_reward(self, monster_speed, sample_size=100):
-    """Return average reward over recent episodes at monster_speed."""
-    if len(self.data) < sample_size:
-      return 0.0
-    rewards = [item['reward'] for item in self.data[-sample_size:]
-               if round(item['monster_speed'], 2) == round(monster_speed, 2)]
-    if len(rewards) < sample_size:  # not enough recent data
-      return 0.0
-    return sum(rewards) / sample_size
+  def get_average_reward(self, monster_speed, min_sample_size=20):
+    """Return average reward over all episodes at monster_speed."""
+    rewards = [d['reward'] for d in self.data if
+               d['monster_speed'] == monster_speed]
+    if len(rewards) >= min_sample_size:
+      return sum(rewards) / len(rewards)
+    return 0.0
 
   def get_last_monster_speed(self):
     """Return last known monster speed."""
@@ -84,22 +82,29 @@ class Stats:
   def build_df(self):
     """Build common dataframe used to plot statistics."""
     df = pd.DataFrame(self.data)
-    df['rolling_n_env_steps'] = df['n_env_steps'].rolling(1000).mean()
-    df['rolling_n_env_steps'] /= df['n_env_steps'].max()
-    df['rolling_reward'] = df['reward'].rolling(1000).mean()
-    df['rolling_loss'] = np.log(df['loss'].rolling(1000).mean())  # note log
+    df['log_loss'] = np.log(df['loss'])
+    grouped = df.groupby(by='monster_speed', as_index=False)
+    for _, g in grouped:
+      df.loc[g.index, 'expanding_reward'] = g['reward'].expanding().mean()
+      df.loc[g.index, 'expanding_steps'] = g['n_env_steps'].expanding().mean()
+      df.loc[g.index, 'expanding_log_loss'] = df['log_loss'].expanding().mean()
     self.df = df
 
     # jumps holds the episode in which the monster's speed has increased
     jumps = df[df['monster_speed'].diff() > 0.01]['episode']
     self.jumps = jumps
 
-  def plot_rewards(self):
-    """Plot reward over time."""
+  def plot_stats(self, num_recent=10000):
+    """Plot expanding reward, steps, and log loss over recent episodes."""
     _, ax = plt.subplots()
-    self.df.plot(x='episode', y='reward', ax=ax, marker='o', linestyle='')
-    self.df.plot(x='episode', y='rolling_reward', ax=ax, linewidth='4')
-    for l in self.jumps:
+    last_episode = self.df['episode'].iloc[-1]
+    sliced = self.df[self.df['episode'] >= last_episode - num_recent]
+    sliced.plot(x='episode', y='expanding_reward', ax=ax, linewidth='2')
+    sliced.plot(x='episode', y='expanding_steps', ax=ax, linewidth='2')
+    sliced.plot(x='episode', y='expanding_log_loss', ax=ax, linewidth='2')
+
+    sliced_jumps = [l for l in self.jumps if l > sliced['episode'].iloc[0]]
+    for l in sliced_jumps:
       ax.axvline(l, color='gray', alpha=0.5)
     plt.show()
 
@@ -117,21 +122,10 @@ class Stats:
 
     _, ax = plt.subplots()
     for k in keys:
-      weights.plot(x='episode', y=k, ax=ax)
+      weights.plot(x='episode', y=k, ax=ax, linewidth=1)
 
     handles, _ = ax.get_legend_handles_labels()
     ax.legend(handles, env_state_index, title='env state index')
-    for l in self.jumps:
-      ax.axvline(l, color='gray', alpha=0.5)
-    plt.show()
-
-  def plot_stats(self):
-    """Plot steps, rewards, and loss over time."""
-
-    _, ax = plt.subplots()
-    self.df.plot(x='episode', y='rolling_n_env_steps', ax=ax)
-    self.df.plot(x='episode', y='rolling_reward', ax=ax)
-    self.df.plot(x='episode', y='rolling_loss', ax=ax)
     for l in self.jumps:
       ax.axvline(l, color='gray', alpha=0.5)
     plt.show()
@@ -162,4 +156,3 @@ if __name__ == '__main__':
   s.build_df()
   s.plot_stats()
   s.plot_weights()
-  s.plot_rewards()
