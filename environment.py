@@ -20,13 +20,20 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
   https://github.com/tensorflow/agents/issues/97
   """
 
-  def __init__(self, monster_speed=1.0, timeout_factor=3, step_size=0.1):
+  def __init__(self, monster_speed=1.0, timeout_factor=3, step_size=0.1, num_actions=4):
     super().__init__()
 
     self.monster_speed = monster_speed
     self.timeout_factor = timeout_factor
     self.step_size = step_size
+    self.num_actions = num_actions
     self.duration = int(timeout_factor / step_size)
+
+    # building the action_to_direction list
+    def to_vector(action):
+      return np.array((np.cos(action * 2 * np.pi / num_actions),
+                       np.sin(action * 2 * np.pi / num_actions)))
+    self.action_to_direction = [to_vector(a) for a in range(num_actions)]
 
     # building the rotation matrix
     self.monster_arc = self.step_size * self.monster_speed
@@ -35,34 +42,33 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     self.cw_rot_matrix = np.array(((c, s), (-s, c)))
 
     self.num_steps = 0
-
     self.position = np.array((0.0, 0.0), dtype=np.float32)
 
     self.monster_angle = 0.0  # only used in render method
     self.prev_action_vector = None  # only used in render method
 
     self._action_spec = array_spec.BoundedArraySpec(
-        shape=(), dtype=np.float32, minimum=0, maximum=2*np.pi, name='action')
+        shape=(), dtype=np.int32, minimum=0, maximum=num_actions - 1, name='action')
     self._observation_spec = array_spec.BoundedArraySpec(
         shape=(6,), dtype=np.float32, minimum=-10, maximum=10, name='observation')
     self._episode_ended = False
 
-  @property
+  @ property
   def _state(self):
     return np.array((self.step_proportion, self.monster_speed,
                      *self.position, self.r, self.theta), dtype=np.float32)
 
-  @property
+  @ property
   def r(self):
     """Return the radius of the player."""
     return np.linalg.norm(self.position)
 
-  @property
+  @ property
   def step_proportion(self):
     """Return proportion of number of steps taken to number of steps allowed."""
     return self.num_steps / self.duration
 
-  @property
+  @ property
   def theta(self):
     """Return the angle of the player."""
     return np.arctan2(self.position[1], self.position[0])
@@ -77,6 +83,8 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     self._episode_ended = False
     self.position = np.array((0.0, 0.0), dtype=np.float32)
     self.num_steps = 0
+    self.monster_angle = 0.0
+    self.prev_action_vector = None
     return time_step.restart(self._state)
 
   def rotate(self):
@@ -106,7 +114,7 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
       # previous action ended the episode so we ignore current action and reset
       return self.reset()
 
-    action_vector = self.step_size * np.array((np.cos(action), np.sin(action)))
+    action_vector = self.step_size * self.action_to_direction[action]
     self.prev_action_vector = action_vector
     self.position += action_vector
     self.rotate()
@@ -141,8 +149,15 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     result = None
     if self._episode_ended:
       _, result = self.determine_reward()
-    im = renderer(self.monster_angle, self.position, self.prev_action_vector,
-                  result, self.monster_speed, self.num_steps)
+    params = {'monster_angle': self.monster_angle,
+              'position': self.position,
+              'prev_action_vector': self.prev_action_vector,
+              'result': result,
+              'step': self.num_steps,
+              'monster_speed': self.monster_speed,
+              'num_actions': self.num_actions,
+              'step_size': self.step_size}
+    im = renderer(**params)
     if mode == 'rgb_array':
       return np.array(im)
     im.show()

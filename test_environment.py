@@ -3,20 +3,20 @@
 
 from tqdm import tqdm
 import numpy as np
-import tensorflow as tf
 from tf_agents.environments import utils, tf_py_environment
-from tf_agents.policies import random_py_policy
+from tf_agents.policies import random_py_policy, random_tf_policy
 from environment import LakeMonsterEnvironment
 from renderer import episode_as_video
 
-TEST_VIDEO_FILENAME = 'test.mp4'
+TEST_VIDEO_FILENAME = 'test'
 
 # nice environment parameters for testing
-test_monster_speed = 0.7
-test_timeout_factor = 20
-test_step_size = 0.05
-params = {'monster_speed': test_monster_speed,
-          'timeout_factor': test_timeout_factor, 'step_size': test_step_size}
+monster_speed = 0.7
+timeout_factor = 20
+step_size = 0.05
+num_actions = 20
+params = {'monster_speed': monster_speed, 'timeout_factor': timeout_factor,
+          'step_size': step_size, 'num_actions': num_actions}
 
 
 def validate_environment():
@@ -31,62 +31,59 @@ def test_py_environment_with_random(num_episodes=1000):
   """Test py environment through random actions."""
   print(f'Testing py environment with {num_episodes} episodes.')
   env = LakeMonsterEnvironment(**params)
-  time_step = env.reset()
+
+  ts = env.reset()
   rewards = []
   num_steps = []
-  captures = []
-  timeouts = []
-  successes = []
+  results = {'capture': 0, 'timeout': 0, 'success': 0}
 
   for _ in tqdm(range(num_episodes)):
-    while not time_step.is_last():
-      action = np.random.uniform(low=0, high=2*np.pi)
-      time_step = env.step(action)
+    while not ts.is_last():
+      action = np.random.randint(0, num_actions)
+      ts = env.step(action)
 
-    reward = time_step.reward
+    reward = ts.reward
     rewards.append(reward)
     num_steps.append(env.num_steps)
-    captures.append(env.r >= 1.0 and reward == -1.0)
-    timeouts.append(env.r < 1.0 and reward == -1.0)
-    successes.append(reward == 1.0)
-    time_step = env.reset()
 
-  assert sum(captures) + sum(timeouts) + sum(successes) == num_episodes
+    _, result = env.determine_reward()
+    results[result] += 1
+    ts = env.reset()
+
+  assert sum(results.values()) == num_episodes
 
   # print results
   print('average num of steps per episode:', np.mean(num_steps))
   print('average reward per episode', np.mean(rewards))
-  print('proportion of timeouts', sum(timeouts) / num_episodes)
-  print('proportion of captures', sum(captures) / num_episodes)
-  print('proportion of successes', sum(successes) / num_episodes)
+  print('proportion of timeouts', results['timeout'] / num_episodes)
+  print('proportion of captures', results['capture'] / num_episodes)
+  print('proportion of successes', results['success'] / num_episodes)
 
 
 def test_tf_environment_with_random(num_episodes=100):
   """Test tf environment through random actions."""
   print(f'Testing tf environment with {num_episodes} episodes.')
+  print("You may see warnings related to TF's preferences for hardware.")
   env = LakeMonsterEnvironment(**params)
   env = tf_py_environment.TFPyEnvironment(env)
-  time_step = env.reset()
+  policy = random_tf_policy.RandomTFPolicy(
+      time_step_spec=env.time_step_spec(), action_spec=env.action_spec())
 
-  assert env.batch_size == 1
-  action = tf.random.uniform(minval=0, maxval=2*np.math.pi, shape=())
-  assert env.action_spec().is_compatible_with(action)
-
-  env.reset()
+  ts = env.reset()
   rewards = []
   num_steps = []
 
   for _ in tqdm(range(num_episodes)):
     num_step = 0
-    while not time_step.is_last():
-      action = tf.random.uniform(minval=0, maxval=2*np.math.pi, shape=())
-      time_step = env.step(action)
+    while not ts.is_last():
+      action = policy.action(ts).action
+      ts = env.step(action)
       num_step += 1
 
-    reward = time_step.reward
+    reward = ts.reward
     rewards.append(reward)
     num_steps.append(num_step)
-    time_step = env.reset()
+    ts = env.reset()
 
   # print results
   print('average num of steps per episode:', np.mean(num_steps))

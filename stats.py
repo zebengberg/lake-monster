@@ -64,7 +64,7 @@ class Stats:
     rewards = [d['reward'] for d in self.data if
                d['monster_speed'] == monster_speed]
     if len(rewards) >= min_sample_size:
-      return sum(rewards) / len(rewards)
+      return round(sum(rewards) / len(rewards), 3)
     return 0.0
 
   def get_last_monster_speed(self):

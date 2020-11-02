@@ -24,14 +24,17 @@ class Agent:
   # hyperparameters
   replay_buffer_max_length = 100000
   batch_size = 64
-  learning_rate = 1e-3
+  learning_rate = 1e-2
 
   def __init__(self, num_actions=4, step_size=0.1, initial_monster_speed=1.0,
-               timeout_factor=3, hidden_layer_nodes=100):
+               timeout_factor=3, fc_layer_params=100, learning_rate=1e-3,
+               epsilon_greedy=0.1):
     self.num_actions = num_actions
     self.step_size = step_size
     self.timeout_factor = timeout_factor
-    self.fc_layer_params = (hidden_layer_nodes,)
+    self.fc_layer_params = fc_layer_params
+    self.learning_rate = learning_rate
+    self.epsilon_greedy = epsilon_greedy
 
     self.stats = Stats()
     self.monster_speed = self.stats.get_last_monster_speed()
@@ -81,6 +84,7 @@ class Agent:
         self.tf_train_env.action_spec(),
         q_network=q_net,
         optimizer=optimizer,
+        epsilon_greedy=self.epsilon_greedy,
         td_errors_loss_fn=common.element_wise_squared_loss,
         train_step_counter=tf.Variable(0))
 
@@ -118,6 +122,17 @@ class Agent:
         replay_buffer=self.replay_buffer,
         global_step=self.agent.train_step_counter
     )
+
+  def confirm_hyperparameters(self):
+    """Confirm that the hyperparameters passed into self agree with objects."""
+    # assert self.learning_rate == self.agent._optimizer.get_config()[
+    #    'learning_rate']
+    print(self.learning_rate)
+    print(self.agent._optimizer.get_config()['learning_rate'])
+
+    print(self.tf_train_env.action_spec())
+
+    x = 1/0
 
   def evaluate_agent(self):
     """Use naive while loop to evaluate policy in single episode."""
@@ -164,6 +179,7 @@ class Agent:
       try:
         is_saved = save_successfully()
       except KeyboardInterrupt:
+        print('I will interrupt as soon as I am done saving!')
         tried_to_interrupt = True
         continue
     print('Progress saved.')
@@ -172,6 +188,7 @@ class Agent:
 
   def train_ad_infinitum(self):
     """Train the agent until interrupted by user."""
+    self.confirm_hyperparameters()
     print_legend()
     while True:
       self.driver.run()  # train a single episode
@@ -186,25 +203,28 @@ class Agent:
              'loss': loss, 'weights': self.get_sample_weights()}
         self.stats.add(d)
         if reward == 1.0:
-          print('$', end='', flush=True)
+          print(success_symbol, end='', flush=True)
         else:
-          print('.', end='', flush=True)
+          print(fail_symbol, end='', flush=True)
 
       if train_step % save_interval == 0:
-        print(f'\nCompleted {train_step} episodes.')
-        print(f'Current monster speed is {self.monster_speed}.')
+        print('')
         self.save_progress()
+        print(f'Completed {train_step} episodes.')
+        print(f'Current monster speed is {self.monster_speed}.')
+        avg_reward = self.stats.get_average_reward(self.monster_speed)
+        print(f'In this learning unit, the average reward is {avg_reward}.')
 
-        if (a := self.stats.get_average_reward(self.monster_speed)) > 0.4:
+        if avg_reward > 0.4:
           # upping the monster speed in proportion to performance
-          self.monster_speed += 0.1 * a
+          self.monster_speed += 0.1 * avg_reward
           self.monster_speed = round(self.monster_speed, 3)
           print('Agent is very strong!')
           print(f'Increasing the monster speed to {self.monster_speed} ...')
           self.reset()
 
       if train_step % video_interval == 0:
-        vid_file = f'episode-{train_step}.mp4'
+        vid_file = f'episode-{train_step}'
         episode_as_video(self.py_eval_env, self.agent.policy,
                          vid_file, self.tf_eval_env)
 
@@ -212,15 +232,17 @@ class Agent:
 eval_interval = 10
 save_interval = 200
 video_interval = 2000
+success_symbol = '$'
+fail_symbol = '|'
 
 
 def print_legend():
   """Print command line training legend."""
   print('\n' + '#' * 80)
   print('          TRAINING LEGEND')
-  print('$ = success on last evaluation episode')
-  print('. = failure on last evaluation episode')
+  print(success_symbol + ' = success on last evaluation episode')
+  print(fail_symbol + ' = failure on last evaluation episode')
   print(f'Evaluation occurs every {eval_interval} episodes')
   print(f'Progress is saved every {save_interval} episodes')
-  print(f'Videos are rendered and saved every {video_interval} episodes')
+  print(f'Videos are rendered every {video_interval} episodes')
   print('#' * 80 + '\n')

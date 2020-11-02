@@ -40,19 +40,20 @@ def arrow_segments(vector):
   # body of the arrow
   x, y = 40 * vector
   u, v = CENTER - RADIUS + 10, CENTER - RADIUS + 10
-  lines = [(u - x, v - y, u + x, v + y)]
+  lines = [(u - x, v + y, u + x, v - y)]
 
   # head of the arrow
   c, s = np.cos(0.65), np.sin(0.65)
   rot_matrix = np.array(((c, -s), (s, c)))
   for mat in [rot_matrix, np.linalg.inv(rot_matrix)]:
     x1, y1 = 10 * np.dot(mat, vector)
-    lines.append((u + x - x1, v + y - y1, u + x, v + y))
+    lines.append((u + x - x1, v - y + y1, u + x, v - y))
 
   return lines
 
 
-def renderer(monster_angle, position, prev_action_vector, result, monster_speed, step):
+def renderer(monster_angle, position, prev_action_vector, result, step,
+             monster_speed, num_actions, step_size):
   """Render an environment state as a PIL image."""
 
   c, s = np.cos(monster_angle), np.sin(monster_angle)
@@ -71,9 +72,14 @@ def renderer(monster_angle, position, prev_action_vector, result, monster_speed,
 
   monster_text = f'MONSTER SPEED: {monster_speed}'
   step_text = f'STEP: {step}'
-  draw.text((CENTER - 150, SIZE - 20), monster_text, (0, 0, 0))
-  draw.text((CENTER + 50, SIZE - 20), step_text, (0, 0, 0))
+  actions_text = f'NUMBER OF ACTIONS: {num_actions}'
+  size_text = f'STEP SIZE: {step_size}'
+  draw.text((10, SIZE - 20), monster_text, (0, 0, 0))
+  draw.text((10, SIZE - 40), actions_text, (0, 0, 0))
+  draw.text((10, SIZE - 60), size_text, (0, 0, 0))
+  draw.text((CENTER - 20, SIZE - 20), step_text, (0, 0, 0))
 
+  # drawing the arrow
   if prev_action_vector is not None:
     real_vector = np.dot(rot_matrix, prev_action_vector)
     unit_vector = real_vector / np.linalg.norm(real_vector)
@@ -81,6 +87,7 @@ def renderer(monster_angle, position, prev_action_vector, result, monster_speed,
     for line in lines:
       draw.line(line, fill=(255, 255, 0), width=4)
 
+  # displaying the episode result
   if result is not None:
     draw.text((CENTER - 10, CENTER + 30), result.upper(), (255, 255, 255))
 
@@ -91,15 +98,11 @@ def episode_as_video(py_env, policy, filename, tf_env=None):
   """Create mp4 video through py_environment render method."""
   print('Creating video with render method ...')
 
-  if not os.path.exists('videos/'):
-    os.mkdir('videos/')
-  filename = os.path.join('videos/', filename)
-
   if tf_env is None:
     tf_env = py_env
 
   fps = 20
-  with imageio.get_writer(filename, fps=fps) as video:
+  with imageio.get_writer('tmp.mp4', fps=fps) as video:
     time_step = tf_env.reset()
     video.append_data(py_env.render())
     while not time_step.is_last():
@@ -108,16 +111,26 @@ def episode_as_video(py_env, policy, filename, tf_env=None):
       video.append_data(py_env.render())
     for _ in range(3 * fps):  # play for 3 more seconds
       video.append_data(py_env.render())
+
+  # giving video file a more descriptive name
+  _, result = py_env.determine_reward()
+  if not os.path.exists('videos/'):
+    os.mkdir('videos/')
+  filename = os.path.join('videos/', filename + '-' + result + '.mp4')
+  os.rename('tmp.mp4', filename)
   print(f'Video created and saved as {filename}')
 
 
-def episode_as_gif(py_env, policy, filepath):
+def episode_as_gif(py_env, policy, filepath, fps=30):
   """Create gif through py_environment render method."""
-  with imageio.get_writer(filepath, mode='I', fps=30) as gif:
+  with imageio.get_writer(filepath, mode='I', fps=fps) as gif:
     time_step = py_env.reset()
+    # using the policy_state to deal with scripted_policy possibility
+    policy_state = policy.get_initial_state()
     gif.append_data(py_env.render())
     while not time_step.is_last():
-      action = policy.action(time_step).action
-      time_step = py_env.step(action)
+      action = policy.action(time_step, policy_state)
+      time_step = py_env.step(action.action)
+      policy_state = action.state
       gif.append_data(py_env.render())
   pygifsicle.optimize(filepath)

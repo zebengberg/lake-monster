@@ -73,7 +73,7 @@ While the Cartesian and polar coordinates give redundant information, the neural
 
 ### Action
 
-Currently, the tf-agent implementation of a DQN agent requires the action of the agent to be both 1-dimensional and discrete. Consequently, the action of the environment is simply an angle corresponding to the direction in which the agent moves. We wrap `LakeMonsterEnvironment` with the tf-agent class `ActionDiscretizeWrapper` to achieve the discretization. The number of possible directions can be passed as `num_actions` to the `Agent` class and has a strong effect on the performance of the agent.
+Currently, the tf-agent implementation of a DQN agent requires the action of the agent to be both 1-dimensional and discrete. Consequently, the action of the environment is simply an angle corresponding to the direction in which the agent moves. We wrap `LakeMonsterEnvironment` with the tf-agent class `ActionDiscretizeWrapper` to achieve the discretization. The number of possible directions can be passed as `num_actions` to the `Agent` class and has a strong effect on the complexity of the Q-network underlying the agent's policy.
 
 ### Reward
 
@@ -93,11 +93,15 @@ There are a number of hyperparameters involved in both the environment specifica
 - `timeout_factor`
 - `hidden_layer_nodes`
 
-### Training wheels
-
-monotonicty
-
 ### Nontrival results
+
+Suppose the agent runs antipodally away from the monster. In turn, the monster will traverse the lake circumference, aiming for the point at which the agent will intersect with the shoreline. (The monster could make his semi-circumnavigation in a clockwise or counterclockwise motion; both paths will take the same time.) In this episode, the agent will travel a total distance of 1 whereas the monster will travel a total distance of pi. Therefore, the agent will succeed with this strategy if and only the speed of the monster is less than pi.
+
+Because this strategy is so simple, we consider it as a baseline minimum for what the agent should aspire to learn. In other words, the agent has learned something nontrivial if it can escape from a monster who has a speed of at least pi. Due to the discretized nature of the environment (specifically, the discrete variables `step_size` and `num_actions`), the agent would not be able to enact this exact strategy. Nevertheless, we still consider a monster speed of pi as a baseline for an intelligent agent.
+
+### Training wheels, passoffs, units
+
+The lake-monster problem exhibits a _monotonicity_ property which we can hope to leverage in training.
 
 ## License
 
