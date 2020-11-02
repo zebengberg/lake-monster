@@ -59,13 +59,21 @@ class Stats:
     """Add a new dictionary to data."""
     self.data.append(d)
 
-  def get_average_reward(self, monster_speed, min_sample_size=20):
-    """Return average reward over all episodes at monster_speed."""
-    rewards = [d['reward'] for d in self.data if
-               d['monster_speed'] == monster_speed]
-    if len(rewards) >= min_sample_size:
-      return round(sum(rewards) / len(rewards), 3)
+  def get_average_reward(self, monster_speed, num_evals=20):
+    """Get average reward over all recent evals at specified monster speed."""
+    rewards = [d['reward'] for d in self.data
+               if d['monster_speed'] == monster_speed]
+    rewards = rewards[-num_evals:]
+    if len(rewards) == num_evals:
+      return round(sum(rewards) / num_evals, 3)
     return 0.0
+
+  def get_number_episodes_on_lt(self, monster_speed):
+    """Return the number of episodes spent within this learning target."""
+    for d in self.data:
+      if d['monster_speed'] == monster_speed:
+        return self.data[-1]['episode'] - d['episode'] + 10
+    return 0
 
   def get_last_monster_speed(self):
     """Return last known monster speed."""
@@ -94,7 +102,7 @@ class Stats:
     jumps = df[df['monster_speed'].diff() > 0.01]['episode']
     self.jumps = jumps
 
-  def plot_stats(self, num_recent=10000):
+  def plot_recent_stats(self, num_recent=100000):
     """Plot expanding reward, steps, and log loss over recent episodes."""
     _, ax = plt.subplots()
     last_episode = self.df['episode'].iloc[-1]
@@ -106,6 +114,12 @@ class Stats:
     sliced_jumps = [l for l in self.jumps if l > sliced['episode'].iloc[0]]
     for l in sliced_jumps:
       ax.axvline(l, color='gray', alpha=0.5)
+    plt.show()
+
+  def plot_learning(self):
+    """Plot monster speed and reward over time."""
+    _, ax = plt.subplots()
+    self.df.plot(x='episode', y='monster_speed', ax=ax)
     plt.show()
 
   def plot_weights(self):
@@ -154,5 +168,6 @@ if __name__ == '__main__':
   # plotting existing stats
   s = Stats()
   s.build_df()
-  s.plot_stats()
+  s.plot_recent_stats()
+  s.plot_learning()
   s.plot_weights()

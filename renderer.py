@@ -52,8 +52,8 @@ def arrow_segments(vector):
   return lines
 
 
-def renderer(monster_angle, position, prev_action_vector, result, step,
-             monster_speed, num_actions, step_size):
+def renderer(monster_angle, prev_monster_angle, position, prev_action_vector,
+             result, step, monster_speed, num_actions, step_size):
   """Render an environment state as a PIL image."""
 
   c, s = np.cos(monster_angle), np.sin(monster_angle)
@@ -81,7 +81,9 @@ def renderer(monster_angle, position, prev_action_vector, result, step,
 
   # drawing the arrow
   if prev_action_vector is not None:
-    real_vector = np.dot(rot_matrix, prev_action_vector)
+    c, s = np.cos(prev_monster_angle), np.sin(prev_monster_angle)
+    prev_rot_matrix = np.array(((c, -s), (s, c)))
+    real_vector = np.dot(prev_rot_matrix, prev_action_vector)
     unit_vector = real_vector / np.linalg.norm(real_vector)
     lines = arrow_segments(unit_vector)
     for line in lines:

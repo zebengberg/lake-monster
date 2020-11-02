@@ -32,9 +32,11 @@ conda activate monster
 pip install -r requirements.txt
 ```
 
-Test the lake-monster environment by running `python test_environment.py`. This script will initialize an agent with a random policy to interact with several versions of `LakeMonsterEnvironment`. A test video will also be generated showing the random movement of the agent within the environment.
+Test the lake-monster environment by running `python test_environment.py`. This script will initialize an agent with a random policy to interact with several versions of `LakeMonsterEnvironment` and create a video showing an episode.
 
-![random policy](assets/random.gif)
+|                ![random policy](assets/random.gif)                |
+| :---------------------------------------------------------------: |
+| _An agent with a random policy interacting with the environment._ |
 
 Train a DQN agent to learn to solve the lake-monster puzzle by running `python acquire_knowledge.py`. This module will periodically save several pieces training knowledge.
 
@@ -73,7 +75,15 @@ While the Cartesian and polar coordinates give redundant information, the neural
 
 ### Action
 
-Currently, the tf-agent implementation of a DQN agent requires the action of the agent to be both 1-dimensional and discrete. Consequently, the action of the environment is simply an angle corresponding to the direction in which the agent moves. We wrap `LakeMonsterEnvironment` with the tf-agent class `ActionDiscretizeWrapper` to achieve the discretization. The number of possible directions can be passed as `num_actions` to the `Agent` class and has a strong effect on the complexity of the Q-network underlying the agent's policy.
+Currently, the tf-agent implementation of a DQN agent requires the action of the agent to be both 1-dimensional and discrete. Consequently, the action of the environment is simply an angle corresponding to the direction in which the agent moves.
+
+bail on wrap!
+
+We wrap `LakeMonsterEnvironment` with the tf-agent class `ActionDiscretizeWrapper` to achieve the discretization. The number of possible directions can be passed as `num_actions` to the `Agent` class and has a strong effect on the complexity of the Q-network underlying the agent's policy.
+
+|             ![discrete actions](assets/actions.gif)              |
+| :--------------------------------------------------------------: |
+| _An agent with `num_actions = 8` moving around the environment._ |
 
 ### Reward
 
@@ -85,21 +95,46 @@ greedy vs exploration
 
 ## Results
 
+### Parameters
+
 There are a number of hyperparameters involved in both the environment specification as well as the DQN agent's network. We describe significant parameters affecting agent performance here.
 
-- `num_actions`
-- `step_size`
-- `initial_monster_speed`
-- `timeout_factor`
-- `hidden_layer_nodes`
+- `num_actions` -- the number of possible directions the agent can move within the environment
+- `step_size` -- the length of each step made by the agent
+- `initial_monster_speed` -- the speed of the monster at the start of training
+- `timeout_factor` -- the episode terminates once the number of steps exceeds `timeout_factor / step_size`
+- `fc_layer_params` -- parameters for the fully connected neural network underlying the policy
+- `learning_rate` -- a parameter for the neural network optimizer
+- `epsilon_greedy` -- a parameter to allow for exploration in training
 
-### Nontrival results
+As `num_actions` and `timeout_factor` grow large and `step_size` approaches 0, the dicrete environment approaches the idealized lake-monster continuous-motion environment. In addition, there are two competing phenomena at play as the discrete environment tends to this limit.
+
+- As `num_actions` grows, the output of the Q-learning neural network grows, thereby increasing the number of weights within the network. As a result, the policy will take longer to train. As `step_size` becomes small, the agent will make less progress toward reaching the shoreline with random untrained movements. As a result, it will take a long time for the agent to avoid timing out.
+- Conversely, the agent will be afforded more freedom in its movement.
+
+TODO: include more about timeout_factor
+
+### Nontrival Learning
 
 Suppose the agent runs antipodally away from the monster. In turn, the monster will traverse the lake circumference, aiming for the point at which the agent will intersect with the shoreline. (The monster could make his semi-circumnavigation in a clockwise or counterclockwise motion; both paths will take the same time.) In this episode, the agent will travel a total distance of 1 whereas the monster will travel a total distance of pi. Therefore, the agent will succeed with this strategy if and only the speed of the monster is less than pi.
 
 Because this strategy is so simple, we consider it as a baseline minimum for what the agent should aspire to learn. In other words, the agent has learned something nontrivial if it can escape from a monster who has a speed of at least pi. Due to the discretized nature of the environment (specifically, the discrete variables `step_size` and `num_actions`), the agent would not be able to enact this exact strategy. Nevertheless, we still consider a monster speed of pi as a baseline for an intelligent agent.
 
-### Training wheels, passoffs, units
+### Training wheels, passoffs, learning targets
+
+What can be tweaked over time?
+
+- monster speed
+- step size
+- timeout factor
+- epsilon
+
+What cannot be tweaked?
+
+- NN stuff
+  - learning rate
+  - fc_layer_params
+  - num_actions
 
 The lake-monster problem exhibits a _monotonicity_ property which we can hope to leverage in training.
 

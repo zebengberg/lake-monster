@@ -20,16 +20,21 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
   https://github.com/tensorflow/agents/issues/97
   """
 
-  def __init__(self, monster_speed=1.0, timeout_factor=3, step_size=0.1, num_actions=4):
+  def __init__(self, monster_speed=1.0, timeout_factor=3, step_size=0.1,
+               num_actions=4, penalty_per_step=0.0):
     super().__init__()
 
     self.monster_speed = monster_speed
     self.timeout_factor = timeout_factor
     self.step_size = step_size
     self.num_actions = num_actions
+    self.penalty_per_step = penalty_per_step
+
+    # total number of allowed steps
     self.duration = int(timeout_factor / step_size)
 
     # building the action_to_direction list
+
     def to_vector(action):
       return np.array((np.cos(action * 2 * np.pi / num_actions),
                        np.sin(action * 2 * np.pi / num_actions)))
@@ -44,6 +49,8 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     self.num_steps = 0
     self.position = np.array((0.0, 0.0), dtype=np.float32)
 
+    # TODO: use derived class for rendering?
+    self.prev_monster_angle = 0.0  # only used in render method
     self.monster_angle = 0.0  # only used in render method
     self.prev_action_vector = None  # only used in render method
 
@@ -89,13 +96,14 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
 
   def rotate(self):
     """Update the position to reflect monster movement."""
+    self.prev_monster_angle = self.monster_angle
     y_sign = np.sign(self.position[1])
 
     if y_sign == 1.0:
       rotated = np.dot(self.cw_rot_matrix, self.position)
       if rotated[1] < 0:
         rotated = np.array((self.r, 0.0))
-        self.monster_angle -= np.arctan2(self.position[1], self.position[0])
+        self.monster_angle += np.arctan2(self.position[1], self.position[0])
       else:
         self.monster_angle += self.monster_arc
       self.position = rotated
@@ -132,7 +140,7 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
       return time_step.termination(self._state, reward=reward)
 
     # still swimming; penalizing for taking so long
-    return time_step.transition(self._state, reward=0)
+    return time_step.transition(self._state, reward=-self.penalty_per_step / self.duration)
     # -0.1 * self.step_proportion)
 
   def determine_reward(self):
@@ -150,6 +158,7 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     if self._episode_ended:
       _, result = self.determine_reward()
     params = {'monster_angle': self.monster_angle,
+              'prev_monster_angle': self.prev_monster_angle,
               'position': self.position,
               'prev_action_vector': self.prev_action_vector,
               'result': result,

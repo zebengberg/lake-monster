@@ -13,3 +13,6 @@ if os.path.exists('videos/'):
 
 if os.path.exists('checkpoints/'):
   shutil.rmtree('checkpoints/')
+
+if os.path.exists('logs/'):
+  shutil.rmtree('logs/')

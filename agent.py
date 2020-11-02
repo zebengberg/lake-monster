@@ -6,7 +6,6 @@ import tensorflow as tf
 from tf_agents.agents.dqn import dqn_agent
 from tf_agents.environments import tf_py_environment, wrappers
 from tf_agents.networks import q_network
-from tf_agents.policies import policy_saver
 from tf_agents.utils import common
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from tf_agents.drivers import dynamic_episode_driver
@@ -24,17 +23,17 @@ class Agent:
   # hyperparameters
   replay_buffer_max_length = 100000
   batch_size = 64
-  learning_rate = 1e-2
 
   def __init__(self, num_actions=4, step_size=0.1, initial_monster_speed=1.0,
                timeout_factor=3, fc_layer_params=100, learning_rate=1e-3,
-               epsilon_greedy=0.1):
+               epsilon_greedy=0.1, penalty_per_step=0.0):
     self.num_actions = num_actions
     self.step_size = step_size
     self.timeout_factor = timeout_factor
     self.fc_layer_params = fc_layer_params
     self.learning_rate = learning_rate
     self.epsilon_greedy = epsilon_greedy
+    self.penalty_per_step = penalty_per_step
 
     self.stats = Stats()
     self.monster_speed = self.stats.get_last_monster_speed()
@@ -47,9 +46,10 @@ class Agent:
     self.checkpointer = self.build_checkpointer()
     self.checkpointer.initialize_or_restore()
     self.weight_indices = self.build_weight_indices()
+    self.summary_writer = self.build_summary_writers()
 
   def reset(self):
-    """Reset variables after updating monster speed."""
+    """Reset variables after updating hyperparameters."""
     self.tf_train_env, self.py_eval_env, self.tf_eval_env = self.build_envs()
     self.q_net, self.agent = self.build_agent()
     self.replay_buffer, self.driver, self.iterator = self.build_data_pipeline()
@@ -60,15 +60,13 @@ class Agent:
     """Initialize environments based on monster_speed."""
     params = {'monster_speed': self.monster_speed,
               'timeout_factor': self.timeout_factor,
-              'step_size': self.step_size}
+              'step_size': self.step_size,
+              'num_actions': self.num_actions,
+              'penalty_per_step': self.penalty_per_step}
     py_train_env = LakeMonsterEnvironment(**params)
-    discrete_py_train_env = wrappers.ActionDiscretizeWrapper(
-        py_train_env, num_actions=self.num_actions)
-    tf_train_env = tf_py_environment.TFPyEnvironment(discrete_py_train_env)
+    tf_train_env = tf_py_environment.TFPyEnvironment(py_train_env)
     py_eval_env = LakeMonsterEnvironment(**params)
-    discrete_py_eval_env = wrappers.ActionDiscretizeWrapper(
-        py_eval_env, num_actions=self.num_actions)
-    tf_eval_env = tf_py_environment.TFPyEnvironment(discrete_py_eval_env)
+    tf_eval_env = tf_py_environment.TFPyEnvironment(py_eval_env)
     return tf_train_env, py_eval_env, tf_eval_env
 
   def build_agent(self):
@@ -123,16 +121,34 @@ class Agent:
         global_step=self.agent.train_step_counter
     )
 
+  def build_summary_writers(self):
+    """Build pipeline to log data to view in TensorBoard."""
+    return tf.summary.create_file_writer('logs/')
+
   def confirm_hyperparameters(self):
-    """Confirm that the hyperparameters passed into self agree with objects."""
-    # assert self.learning_rate == self.agent._optimizer.get_config()[
-    #    'learning_rate']
-    print(self.learning_rate)
-    print(self.agent._optimizer.get_config()['learning_rate'])
+    """Confirm that hyperparameters passed into self agree with tf objects."""
+    print('Confirming hyperparameters ...')
 
-    print(self.tf_train_env.action_spec())
+    # NN parameters
+    optimizer = self.agent._optimizer
+    assert optimizer.get_config()['learning_rate'] == self.learning_rate
+    # layers is list of all layers except for final output layer
+    layers = self.q_net.layers[0].get_weights()
+    for i, l in enumerate(layers):
+      if i % 2 == 0:
+        assert l.shape[1] == self.fc_layer_params[i // 2]
+    final_layer = self.q_net.layers[1].get_weights()
+    assert final_layer[0].shape[1] == self.num_actions
 
-    x = 1/0
+    # agent parameters
+    assert self.agent._epsilon_greedy == self.epsilon_greedy
+
+    # environment parameters
+    n = self.tf_train_env.action_spec().maximum - self.tf_train_env.action_spec().minimum
+    assert n + 1 == self.num_actions
+    assert self.py_eval_env.step_size == self.step_size
+    assert self.py_eval_env.timeout_factor == self.timeout_factor
+    assert self.py_eval_env.penalty_per_step == self.penalty_per_step
 
   def evaluate_agent(self):
     """Use naive while loop to evaluate policy in single episode."""
@@ -186,6 +202,18 @@ class Agent:
     if tried_to_interrupt:
       raise KeyboardInterrupt
 
+  def has_reached_mastery(self, score, num_episodes):
+    """Determine if the agent has reached mastery of the learning target."""
+    if score > 0.7:
+      # upping the monster speed according to num_episodes
+      self.monster_speed += 0.1 * 200 / num_episodes
+      self.monster_speed = round(self.monster_speed, 3)
+      print('Agent has mastered the learning target!')
+      print(f'Increasing the monster speed to {self.monster_speed} ...')
+      self.reset()
+
+      # TODO: consider upping step_size, timeout_factor
+
   def train_ad_infinitum(self):
     """Train the agent until interrupted by user."""
     self.confirm_hyperparameters()
@@ -202,6 +230,13 @@ class Agent:
              'n_env_steps': n_steps, 'monster_speed': self.monster_speed,
              'loss': loss, 'weights': self.get_sample_weights()}
         self.stats.add(d)
+
+        with self.summary_writer.as_default():
+          tf.summary.scalar('loss', loss, train_step)
+          tf.summary.scalar('reward', reward, train_step)
+          tf.summary.scalar('n_env_steps', n_steps, train_step)
+          tf.summary.scalar('monster_speed', self.monster_speed, train_step)
+
         if reward == 1.0:
           print(success_symbol, end='', flush=True)
         else:
@@ -213,15 +248,10 @@ class Agent:
         print(f'Completed {train_step} episodes.')
         print(f'Current monster speed is {self.monster_speed}.')
         avg_reward = self.stats.get_average_reward(self.monster_speed)
-        print(f'In this learning unit, the average reward is {avg_reward}.')
-
-        if avg_reward > 0.4:
-          # upping the monster speed in proportion to performance
-          self.monster_speed += 0.1 * avg_reward
-          self.monster_speed = round(self.monster_speed, 3)
-          print('Agent is very strong!')
-          print(f'Increasing the monster speed to {self.monster_speed} ...')
-          self.reset()
+        print(f'Over last eval period, the average reward is {avg_reward}.')
+        num_episodes = self.stats.get_number_episodes_on_lt(self.monster_speed)
+        print(f'The agent has trained {num_episodes} episodes for this LT.')
+        self.has_reached_mastery(avg_reward, num_episodes)
 
       if train_step % video_interval == 0:
         vid_file = f'episode-{train_step}'
@@ -230,8 +260,8 @@ class Agent:
 
 
 eval_interval = 10
-save_interval = 200
-video_interval = 2000
+save_interval = 100
+video_interval = 1000
 success_symbol = '$'
 fail_symbol = '|'
 
