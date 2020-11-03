@@ -2,7 +2,8 @@
 .vscode
 __pycache__
 
-# saved checkpoints, data, videos
+# saved checkpoints, data, videos, tensorboard stuff
 *.mp4
 *.json
 checkpoints/
+logs/
