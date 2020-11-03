@@ -2,11 +2,7 @@
 
 import os
 import shutil
-from stats import FILE_NAME as stats_file
 
-
-if os.path.exists(stats_file):
-  os.remove(stats_file)
 
 if os.path.exists('videos/'):
   shutil.rmtree('videos/')

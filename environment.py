@@ -147,9 +147,9 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     """If the episode has ended, return the reward and result."""
     assert self._episode_ended
     if self.r >= 1.0:
-      if round(self.position[1], 4) == 0.0 and self.position[0] > 0:
+      if round(self.position[1], 6) == 0.0 and self.position[0] > 0:
         return -1, 'capture'
-      return 1, 'success'
+      return 1 + abs(self.theta), 'success'
     return -1, 'timeout'
 
   def render(self, mode='rgb_array'):

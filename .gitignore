@@ -3,7 +3,6 @@
 __pycache__
 
 # saved checkpoints, data, videos, tensorboard stuff
-*.mp4
-*.json
+videos/
 checkpoints/
 logs/
