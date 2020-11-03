@@ -138,6 +138,8 @@ What cannot be tweaked?
 
 The lake-monster problem exhibits a _monotonicity_ property which we can hope to leverage in training.
 
+### Tensorboard
+
 ## License
 
 [MIT License](LICENSE.md)

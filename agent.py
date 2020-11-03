@@ -180,12 +180,12 @@ class Agent:
     # using a threshold of 80% for now
     if self.learning_score >= 0.8 * (num_eval := save_interval // eval_interval):
       print('Agent is very smart. Increasing the monster speed ...')
-      self.monster_speed.assign_add(0.01)
+      self.monster_speed.assign_add(0.03)
       self.reset()
 
     print(f'Completed {step} training episodes.')
     print(f'Monster speed: {round(self.monster_speed.numpy().item(), 3)}.')
-    print(f'Score over last {num_eval} evaluations: {self.learning_score}')
+    print(f'Score over evaluation period: {self.learning_score} / {num_eval}')
     self.learning_score = 0
     print('_' * 80)
 

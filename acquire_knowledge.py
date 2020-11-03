@@ -11,7 +11,7 @@ params = {'num_actions': 8,
           'fc_layer_params': (80, 80),
           'learning_rate': 0.01,
           'epsilon_greedy': 0.2,
-          'penalty_per_step': 0.01}
+          'penalty_per_step': 0.1}
 
 
 if __name__ == '__main__':
