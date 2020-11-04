@@ -24,9 +24,9 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
                num_actions=4, penalty_per_step=0.0):
     super().__init__()
 
-    self.monster_speed = monster_speed
+    self.monster_speed = round(monster_speed, 3)
     self.timeout_factor = timeout_factor
-    self.step_size = step_size
+    self.step_size = round(step_size, 2)
     self.num_actions = num_actions
     self.penalty_per_step = penalty_per_step
 

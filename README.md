@@ -97,6 +97,8 @@ greedy vs exploration
 
 ### Parameters
 
+What does the network depend on? What does just the environment depend on??
+
 There are a number of hyperparameters involved in both the environment specification as well as the DQN agent's network. We describe significant parameters affecting agent performance here.
 
 - `num_actions` -- the number of possible directions the agent can move within the environment

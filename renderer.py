@@ -103,7 +103,7 @@ def episode_as_video(py_env, policy, filename, tf_env=None):
   if tf_env is None:
     tf_env = py_env
 
-  fps = 20
+  fps = 10
   with imageio.get_writer('tmp.mp4', fps=fps) as video:
     time_step = tf_env.reset()
     video.append_data(py_env.render())
@@ -123,16 +123,20 @@ def episode_as_video(py_env, policy, filename, tf_env=None):
   print(f'Video created and saved as {filename}')
 
 
-def episode_as_gif(py_env, policy, filepath, fps=30):
+def episode_as_gif(py_env, policy, filepath, fps=30, tf_env=None):
   """Create gif through py_environment render method."""
+
+  if tf_env is None:
+    tf_env = py_env
+
   with imageio.get_writer(filepath, mode='I', fps=fps) as gif:
-    time_step = py_env.reset()
+    time_step = tf_env.reset()
     # using the policy_state to deal with scripted_policy possibility
-    policy_state = policy.get_initial_state()
+    policy_state = policy.get_initial_state(batch_size=1)
     gif.append_data(py_env.render())
     while not time_step.is_last():
       action = policy.action(time_step, policy_state)
-      time_step = py_env.step(action.action)
+      time_step = tf_env.step(action.action)
       policy_state = action.state
       gif.append_data(py_env.render())
   pygifsicle.optimize(filepath)

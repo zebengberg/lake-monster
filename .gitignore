@@ -2,7 +2,8 @@
 .vscode
 __pycache__
 
-# saved checkpoints, data, videos, tensorboard stuff
-videos/
+# saved checkpoints, data, tensorboard logs, policies
 checkpoints/
+videos/
 logs/
+policies/

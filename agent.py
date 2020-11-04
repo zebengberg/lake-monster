@@ -8,6 +8,7 @@ from tf_agents.networks import q_network
 from tf_agents.utils import common
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from tf_agents.drivers import dynamic_episode_driver
+from tf_agents.policies import policy_saver
 from environment import LakeMonsterEnvironment
 from renderer import episode_as_video
 
@@ -23,16 +24,24 @@ class Agent:
   replay_buffer_max_length = 100000
   batch_size = 64
 
-  def __init__(self, num_actions=4, step_size=0.1, initial_monster_speed=1.0,
-               timeout_factor=3, fc_layer_params=(100,), learning_rate=1e-3,
-               epsilon_greedy=0.1, penalty_per_step=0.0):
+  def __init__(
+          self, num_actions=4,
+          initial_step_size=0.1,
+          initial_monster_speed=1.0,
+          timeout_factor=3,
+          fc_layer_params=(100,),
+          learning_rate=1e-3,
+          epsilon_greedy=0.1,
+          penalty_per_step=0.0,
+          name='unnamed_agent'):
+
     self.num_actions = num_actions
-    self.step_size = step_size
     self.timeout_factor = timeout_factor
     self.fc_layer_params = fc_layer_params
     self.learning_rate = learning_rate
     self.epsilon_greedy = epsilon_greedy
     self.penalty_per_step = penalty_per_step
+    self.name = name
 
     # variable for determining learning target mastery
     self.learning_score = 0
@@ -45,6 +54,7 @@ class Agent:
     self.q_net, self.agent = self.build_agent()
     self.replay_buffer = self.build_replay_buffer()
     self.monster_speed = tf.Variable(initial_monster_speed, dtype=tf.float64)
+    self.step_size = tf.Variable(initial_step_size, dtype=tf.float64)
     self.checkpointer = self.build_checkpointer()
     self.checkpointer.initialize_or_restore()
 
@@ -96,13 +106,14 @@ class Agent:
         policy=self.agent.policy,
         replay_buffer=self.replay_buffer,
         train_step_counter=self.agent.train_step_counter,
-        monster_speed=self.monster_speed)
+        monster_speed=self.monster_speed,
+        step_size=self.step_size)
 
   def build_envs(self):
     """Build training and evaluation environments."""
-    params = {'monster_speed': round(self.monster_speed.numpy().item(), 3),
+    params = {'monster_speed': self.monster_speed.numpy().item(),
               'timeout_factor': self.timeout_factor,
-              'step_size': self.step_size,
+              'step_size': self.step_size.numpy().item(),
               'num_actions': self.num_actions,
               'penalty_per_step': self.penalty_per_step}
     py_train_env = LakeMonsterEnvironment(**params)
@@ -142,10 +153,11 @@ class Agent:
     return reward, proportion_steps
 
   def save_progress(self, step):
-    """Save checkpoints and updated stats. Ignore keyboard interruptions."""
+    """Save checkpoints and write tf.summary. Ignore keyboard interruptions."""
     def save_successfully():
       self.checkpointer.save(step)  # step is used as name
       tf.summary.scalar('monster_speed', self.monster_speed, step)
+      tf.summary.scalar('step_size', self.step_size, step)
       tf.summary.scalar('learning_score', self.learning_score, step)
       for i, layer in enumerate(self.q_net.layers[0].get_weights()):
         tf.summary.histogram(f'layer{i}', layer, step)
@@ -167,6 +179,25 @@ class Agent:
     if tried_to_interrupt:
       raise KeyboardInterrupt
 
+  def save_policy(self):
+    """Save strong policy with tf-agent PolicySaver."""
+    print('Saving a strong policy.')
+    # saving environment params as metadata in order to reconstruct environment
+    step = self.agent.train_step_counter
+    metadata = {'monster_speed': self.monster_speed,  # already tf.Variable
+                'step_size': self.step_size,  # already tf.Variable
+                'timeout_factor': tf.Variable(self.timeout_factor),
+                'num_actions': tf.Variable(self.num_actions),
+                'penalty_per_step': tf.Variable(self.penalty_per_step)}
+    saver = policy_saver.PolicySaver(self.agent.policy,
+                                     train_step=step,
+                                     metadata=metadata,
+                                     batch_size=None)
+    dir_name = f'policy-{self.name}-{step.numpy().item()}'
+    filepath = os.path.join('policies', dir_name)
+    saver.save(filepath)
+    print('Policy saved.')
+
   def run_save(self, step):
     """Call save_progress and print out key statistics."""
     print('')
@@ -179,12 +210,15 @@ class Agent:
     # determine if agent should move on to next learning target
     # using a threshold of 80% for now
     if self.learning_score >= 0.8 * (num_eval := save_interval // eval_interval):
+      if self.learning_score >= 3:
+        self.save_policy()
       print('Agent is very smart. Increasing the monster speed ...')
       self.monster_speed.assign_add(0.03)
       self.reset()
 
     print(f'Completed {step} training episodes.')
     print(f'Monster speed: {round(self.monster_speed.numpy().item(), 3)}.')
+    print(f'Step size: {round(self.step_size.numpy().item(), 2)}.')
     print(f'Score over evaluation period: {self.learning_score} / {num_eval}')
     self.learning_score = 0
     print('_' * 80)
