@@ -40,6 +40,7 @@ def test_agent(params=None):
   if params is None:
     params = {}
   a = Agent(**params)
+  print('Summary of underlying neural network:')
   a.q_net.summary()
   assert len(a.q_net.layers) == 2
 

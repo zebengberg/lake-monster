@@ -1,6 +1,9 @@
 """A tf-agent policy, driver, replay_buffer, and agent for the monster lake problem."""
 
+
 import os
+import warnings
+import absl.logging
 import tensorflow as tf
 from tf_agents.agents.dqn import dqn_agent
 from tf_agents.environments import tf_py_environment
@@ -13,7 +16,9 @@ from environment import LakeMonsterEnvironment
 from renderer import episode_as_video
 
 
-# suppressing some warnings
+# suppressing some annoying warnings
+warnings.filterwarnings('ignore', category=UserWarning)
+absl.logging.set_verbosity(absl.logging.ERROR)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
@@ -167,7 +172,7 @@ class Agent:
 
     is_saved = False
     tried_to_interrupt = False
-    print('Saving progress to disk ...')
+    print('Saving checkpointer and logs to disk ...')
     while not is_saved:
       try:
         is_saved = save_successfully()
@@ -175,7 +180,7 @@ class Agent:
         print('I will interrupt as soon as I am done saving!')
         tried_to_interrupt = True
         continue
-    print('Progress saved.')
+    print('Save successful.')
     if tried_to_interrupt:
       raise KeyboardInterrupt
 
@@ -202,26 +207,31 @@ class Agent:
     """Call save_progress and print out key statistics."""
     print('')
     self.save_progress(step)
-
-    if step % video_interval == 0:
+    if step % VIDEO_INTERVAL == 0:
       episode_as_video(self.py_eval_env, self.agent.policy,
                        f'episode-{step}', self.tf_eval_env)
-
-    # determine if agent should move on to next learning target
-    # using a threshold of 80% for now
-    if self.learning_score >= 0.8 * (num_eval := save_interval // eval_interval):
-      if self.learning_score >= 3:
-        self.save_policy()
-      print('Agent is very smart. Increasing the monster speed ...')
-      self.monster_speed.assign_add(0.03)
-      self.reset()
-
+    self.check_mastery()
     print(f'Completed {step} training episodes.')
     print(f'Monster speed: {round(self.monster_speed.numpy().item(), 3)}.')
     print(f'Step size: {round(self.step_size.numpy().item(), 2)}.')
-    print(f'Score over evaluation period: {self.learning_score} / {num_eval}')
+    print(f'Score over evaluation period: {self.learning_score} / {NUM_EVALS}')
     self.learning_score = 0
     print('_' * 80)
+
+  def check_mastery(self):
+    """Determine if policy is sufficiently strong to tweak monster_speed, step_size."""
+    if self.learning_score >= 0.8 * NUM_EVALS:  # threshold 80%
+      if self.monster_speed.numpy().item() >= 3:  # only strong policies!
+        self.save_policy()
+      print('Agent is very smart.')
+      if round(self.step_size.numpy().item(), 1) == 0.1:
+        print('Increasing the monster speed and increasing step size.')
+        self.monster_speed.assign_add(0.03)
+        self.step_size.assign(0.3)
+      else:
+        print('Decreasing the step size.')
+        self.step_size.assign(0.1)
+      self.reset()
 
   def run_eval(self, step):
     """Evaluate agent and print out key statistics."""
@@ -231,10 +241,10 @@ class Agent:
     tf.summary.scalar('n_env_steps', n_steps, step)
 
     if reward >= 1.0:
-      print(success_symbol, end='', flush=True)
+      print(SUCCESS_SYMBOL, end='', flush=True)
       self.learning_score += 1
     else:
-      print(fail_symbol, end='', flush=True)
+      print(FAIL_SYMBOL, end='', flush=True)
 
   def train_ad_infinitum(self):
     """Train the agent until interrupted by user."""
@@ -246,28 +256,29 @@ class Agent:
       experience, _ = next(self.iterator)
       self.agent.train(experience)
 
-      if train_step % save_interval == 0:
+      if train_step % SAVE_INTERVAL == 0:
         self.run_save(train_step)
 
-      if train_step % eval_interval == 0:
+      if train_step % EVAL_INTERVAL == 0:
         self.run_eval(train_step)
 
 
 # a few constant global variables
-eval_interval = 10
-save_interval = 200
-video_interval = 2000
-success_symbol = '$'
-fail_symbol = '|'
+EVAL_INTERVAL = 10
+SAVE_INTERVAL = 200
+VIDEO_INTERVAL = 2000
+NUM_EVALS = SAVE_INTERVAL // EVAL_INTERVAL
+SUCCESS_SYMBOL = '$'
+FAIL_SYMBOL = '|'
 
 
 def print_legend():
   """Print command line training legend."""
   print('\n' + '#' * 80)
   print('          TRAINING LEGEND')
-  print(success_symbol + ' = success on last evaluation episode')
-  print(fail_symbol + ' = failure on last evaluation episode')
-  print(f'Evaluation occurs every {eval_interval} episodes')
-  print(f'Progress is saved every {save_interval} episodes')
-  print(f'Videos are rendered every {video_interval} episodes')
+  print(SUCCESS_SYMBOL + ' = success on last evaluation episode')
+  print(FAIL_SYMBOL + ' = failure on last evaluation episode')
+  print(f'Evaluation occurs every {EVAL_INTERVAL} episodes')
+  print(f'Progress is saved every {SAVE_INTERVAL} episodes')
+  print(f'Videos are rendered every {VIDEO_INTERVAL} episodes')
   print('#' * 80 + '\n')

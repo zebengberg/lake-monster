@@ -15,8 +15,8 @@ def launch_tb():
   webbrowser.open_new_tab(url)
 
 
-params = {'num_actions': 8,
-          'initial_step_size': 0.1,
+params = {'num_actions': 16,
+          'initial_step_size': 0.3,
           'initial_monster_speed': 1.0,
           'timeout_factor': 3,
           'fc_layer_params': (20, 20),

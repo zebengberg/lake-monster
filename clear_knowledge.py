@@ -12,3 +12,7 @@ if os.path.exists('checkpoints/'):
 
 if os.path.exists('logs/'):
   shutil.rmtree('logs/')
+
+# clearing policies (for now!)
+if os.path.exists('policies'):
+  shutil.rmtree('policies')
