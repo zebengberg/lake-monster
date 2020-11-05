@@ -15,7 +15,7 @@ from tf_agents.policies import policy_saver
 from environment import LakeMonsterEnvironment
 from renderer import episode_as_video
 from param_search import log_results
-from read_logs import build_df
+from read_logs import build_df, is_progress_made
 
 
 # suppressing some annoying warnings
@@ -256,24 +256,13 @@ class Agent:
       if self.monster_speed.numpy().item() >= 3:  # only strong policies!
         self.save_policy()
       print('Agent is very smart. Increasing monster speed ...')
-      self.monster_speed.assign_add(0.05)
-      self.cycle_step_size()  # to ensure we learn macro and micro details
+      if (self.monster_speed.numpy().item() >= 3.2):
+        self.monster_speed.assign_add(0.02)
+      else:
+        self.monster_speed.assign_add(0.05)
 
-    elif self.learning_score == 0:  # to ensure we don't get stuck in failure
-      self.cycle_step_size()
-
-  def cycle_step_size(self):
-    """Switch step size."""
-    # TODO: fix this
-    py_step_size = self.step_size.numpy().item()
-    py_step_size = round(py_step_size, 2)
-    if py_step_size == 0.3:
-      py_step_size = 0.1
-    else:
-      py_step_size = 0.3
-
-    self.step_size.assign(py_step_size)
-    self.reset()
+    elif not is_progress_made():  # if no progress, reduce step size
+      self.step_size.assign(tf.multiply(self.step_size, 0.6))
 
   def run_eval(self, step):
     """Evaluate agent and print out key statistics."""

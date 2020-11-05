@@ -19,13 +19,13 @@ def launch_tb():
 
 
 handmade_params = {'num_actions': 16,
-                   'initial_step_size': 0.3,
+                   'initial_step_size': 0.4,
                    'initial_monster_speed': 1.0,
                    'timeout_factor': 3,
                    'fc_layer_params': (20, 20),
                    'dropout_layer_params': (0.1, 0.1),
                    'learning_rate': 0.01,
-                   'epsilon_greedy': 0.2,
+                   'epsilon_greedy': 0.1,
                    'penalty_per_step': 0.0}
 
 
@@ -44,7 +44,6 @@ def build_new_agent(params=None):
 
 def restore_existing_agent():
   """Build new agent from scratch."""
-
   if not os.path.exists('agent_id.txt'):
     raise FileNotFoundError('Cannot find agent_id.txt')
   uid, params = read_params()
