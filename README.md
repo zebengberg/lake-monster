@@ -5,6 +5,7 @@
 - [Introduction](#introduction)
 - [Installation and Usage](#installation-and-usage)
 - [Environment](#environment)
+- [Learning](#learning)
 - [Results](#results)
 - [License](#license)
 

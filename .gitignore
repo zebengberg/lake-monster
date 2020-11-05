@@ -2,8 +2,10 @@
 .vscode
 __pycache__
 
-# saved checkpoints, data, tensorboard logs, policies
+# saved checkpoints, data, tensorboard logs, policies, results, agent id
 checkpoints/
 videos/
 logs/
 policies/
+results.json
+agent_id.txt

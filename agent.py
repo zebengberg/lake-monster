@@ -14,6 +14,8 @@ from tf_agents.drivers import dynamic_episode_driver
 from tf_agents.policies import policy_saver
 from environment import LakeMonsterEnvironment
 from renderer import episode_as_video
+from param_search import log_results
+from read_logs import build_df
 
 
 # suppressing some annoying warnings
@@ -23,6 +25,27 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
+# a few constant global variables
+EVAL_INTERVAL = 10
+SAVE_INTERVAL = 200
+VIDEO_INTERVAL = 2000
+NUM_EVALS = SAVE_INTERVAL // EVAL_INTERVAL
+SUCCESS_SYMBOL = '$'
+FAIL_SYMBOL = '|'
+
+
+def print_legend():
+  """Print command line training legend."""
+  print('\n' + '#' * 80)
+  print('          TRAINING LEGEND')
+  print(SUCCESS_SYMBOL + ' = success on last evaluation episode')
+  print(FAIL_SYMBOL + ' = failure on last evaluation episode')
+  print(f'Evaluation occurs every {EVAL_INTERVAL} episodes')
+  print(f'Progress is saved every {SAVE_INTERVAL} episodes')
+  print(f'Videos are rendered every {VIDEO_INTERVAL} episodes')
+  print('#' * 80 + '\n')
+
+
 class Agent:
   """A class to hold global variables for tf_agent training."""
   # hyperparameters
@@ -30,23 +53,25 @@ class Agent:
   batch_size = 64
 
   def __init__(
-          self, num_actions=4,
-          initial_step_size=0.1,
+          self,
+          uid='unknown',
+          num_actions=4,
+          initial_step_size=0.3,
           initial_monster_speed=1.0,
           timeout_factor=3,
           fc_layer_params=(100,),
+          dropout_layer_params=None,
           learning_rate=1e-3,
           epsilon_greedy=0.1,
-          penalty_per_step=0.0,
-          name='unnamed_agent'):
+          penalty_per_step=0.0):
 
     self.num_actions = num_actions
     self.timeout_factor = timeout_factor
     self.fc_layer_params = fc_layer_params
+    self.dropout_layer_params = dropout_layer_params
     self.learning_rate = learning_rate
     self.epsilon_greedy = epsilon_greedy
     self.penalty_per_step = penalty_per_step
-    self.name = name
 
     # variable for determining learning target mastery
     self.learning_score = 0
@@ -56,10 +81,12 @@ class Agent:
     self.writer.set_as_default()
 
     # defining items which are tracked in checkpointer
-    self.q_net, self.agent = self.build_agent()
-    self.replay_buffer = self.build_replay_buffer()
+    self.uid = tf.Variable(uid, dtype=tf.string)
     self.monster_speed = tf.Variable(initial_monster_speed, dtype=tf.float64)
     self.step_size = tf.Variable(initial_step_size, dtype=tf.float64)
+    self.q_net, self.agent = self.build_agent()
+    self.replay_buffer = self.build_replay_buffer()
+
     self.checkpointer = self.build_checkpointer()
     self.checkpointer.initialize_or_restore()
 
@@ -79,7 +106,8 @@ class Agent:
     q_net = q_network.QNetwork(
         tf_temp_env.observation_spec(),
         tf_temp_env.action_spec(),
-        fc_layer_params=self.fc_layer_params)
+        fc_layer_params=self.fc_layer_params,
+        dropout_layer_params=self.dropout_layer_params)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
     agent = dqn_agent.DqnAgent(
@@ -111,6 +139,7 @@ class Agent:
         policy=self.agent.policy,
         replay_buffer=self.replay_buffer,
         train_step_counter=self.agent.train_step_counter,
+        uid=self.uid,
         monster_speed=self.monster_speed,
         step_size=self.step_size)
 
@@ -198,7 +227,7 @@ class Agent:
                                      train_step=step,
                                      metadata=metadata,
                                      batch_size=None)
-    dir_name = f'policy-{self.name}-{step.numpy().item()}'
+    dir_name = f'{self.uid.numpy().decode()}-{step.numpy().item()}'
     filepath = os.path.join('policies', dir_name)
     saver.save(filepath)
     print('Policy saved.')
@@ -210,6 +239,9 @@ class Agent:
     if step % VIDEO_INTERVAL == 0:
       episode_as_video(self.py_eval_env, self.agent.policy,
                        f'episode-{step}', self.tf_eval_env)
+      df = build_df()
+      log_results(self.uid.numpy().decode(), df.to_dict(orient='list'))
+
     self.check_mastery()
     print(f'Completed {step} training episodes.')
     print(f'Monster speed: {round(self.monster_speed.numpy().item(), 3)}.')
@@ -223,15 +255,25 @@ class Agent:
     if self.learning_score >= 0.8 * NUM_EVALS:  # threshold 80%
       if self.monster_speed.numpy().item() >= 3:  # only strong policies!
         self.save_policy()
-      print('Agent is very smart.')
-      if round(self.step_size.numpy().item(), 1) == 0.1:
-        print('Increasing the monster speed and increasing step size.')
-        self.monster_speed.assign_add(0.03)
-        self.step_size.assign(0.3)
-      else:
-        print('Decreasing the step size.')
-        self.step_size.assign(0.1)
-      self.reset()
+      print('Agent is very smart. Increasing monster speed ...')
+      self.monster_speed.assign_add(0.05)
+      self.cycle_step_size()  # to ensure we learn macro and micro details
+
+    elif self.learning_score == 0:  # to ensure we don't get stuck in failure
+      self.cycle_step_size()
+
+  def cycle_step_size(self):
+    """Switch step size."""
+    # TODO: fix this
+    py_step_size = self.step_size.numpy().item()
+    py_step_size = round(py_step_size, 2)
+    if py_step_size == 0.3:
+      py_step_size = 0.1
+    else:
+      py_step_size = 0.3
+
+    self.step_size.assign(py_step_size)
+    self.reset()
 
   def run_eval(self, step):
     """Evaluate agent and print out key statistics."""
@@ -261,24 +303,3 @@ class Agent:
 
       if train_step % EVAL_INTERVAL == 0:
         self.run_eval(train_step)
-
-
-# a few constant global variables
-EVAL_INTERVAL = 10
-SAVE_INTERVAL = 200
-VIDEO_INTERVAL = 2000
-NUM_EVALS = SAVE_INTERVAL // EVAL_INTERVAL
-SUCCESS_SYMBOL = '$'
-FAIL_SYMBOL = '|'
-
-
-def print_legend():
-  """Print command line training legend."""
-  print('\n' + '#' * 80)
-  print('          TRAINING LEGEND')
-  print(SUCCESS_SYMBOL + ' = success on last evaluation episode')
-  print(FAIL_SYMBOL + ' = failure on last evaluation episode')
-  print(f'Evaluation occurs every {EVAL_INTERVAL} episodes')
-  print(f'Progress is saved every {SAVE_INTERVAL} episodes')
-  print(f'Videos are rendered every {VIDEO_INTERVAL} episodes')
-  print('#' * 80 + '\n')
