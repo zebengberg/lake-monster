@@ -260,9 +260,11 @@ class Agent:
         self.monster_speed.assign_add(0.02)
       else:
         self.monster_speed.assign_add(0.05)
+      self.reset()
 
     elif not is_progress_made():  # if no progress, reduce step size
       self.step_size.assign(tf.multiply(self.step_size, 0.6))
+      self.reset()
 
   def run_eval(self, step):
     """Evaluate agent and print out key statistics."""
