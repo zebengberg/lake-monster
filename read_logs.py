@@ -46,8 +46,8 @@ def is_progress_made():
   current_step_size = df['step_size'].loc[current_episode]
 
   # the log approximates how many step_size reductions have been made
-  num_episodes = int(1e4 * np.log(1 + initial_step_size / current_step_size))
-  print(num_episodes)
+  num_reductions = np.log(initial_step_size / current_step_size)
+  num_episodes = int(2 * 1e4 * (num_reductions + 1))
 
   # only looking at entries with step_size equal to current value
   df = df[df['step_size'] == current_step_size]

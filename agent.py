@@ -253,17 +253,18 @@ class Agent:
   def check_mastery(self):
     """Determine if policy is sufficiently strong to tweak monster_speed, step_size."""
     if self.learning_score >= 0.8 * NUM_EVALS:  # threshold 80%
-      if self.monster_speed.numpy().item() >= 3:  # only strong policies!
+      if self.monster_speed.numpy().item() >= 3.0:  # only strong policies!
         self.save_policy()
       print('Agent is very smart. Increasing monster speed ...')
-      if (self.monster_speed.numpy().item() >= 3.2):
+      if self.monster_speed.numpy().item() >= 3.0:
         self.monster_speed.assign_add(0.02)
       else:
         self.monster_speed.assign_add(0.05)
       self.reset()
 
     elif not is_progress_made():  # if no progress, reduce step size
-      self.step_size.assign(tf.multiply(self.step_size, 0.6))
+      print("No progress has been made! The agent's step size is decreasing.")
+      self.step_size.assign(tf.multiply(self.step_size, 0.5))
       self.reset()
 
   def run_eval(self, step):
