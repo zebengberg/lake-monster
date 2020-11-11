@@ -8,6 +8,7 @@ import numpy as np
 
 def build_df():
   """Use tf logs to build DataFrame containing monster speeds."""
+  tf.summary.flush()
   log_data = glob.glob('logs/events*')
   speeds = {}
   scores = {}
