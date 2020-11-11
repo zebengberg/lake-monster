@@ -18,15 +18,14 @@ def launch_tb():
   webbrowser.open_new_tab(url)
 
 
-handmade_params = {'num_actions': 16,
-                   'initial_step_size': 0.3,
-                   'initial_monster_speed': 1.0,
+handmade_params = {'num_actions': 6,
+                   'initial_step_size': 0.1,
+                   'initial_monster_speed': 2.5,
                    'timeout_factor': 3,
-                   'fc_layer_params': (50, 50),
+                   'fc_layer_params': (20, 20),
                    'dropout_layer_params': (0.1, 0.1),
                    'learning_rate': 0.01,
-                   'epsilon_greedy': 0.1,
-                   'penalty_per_step': 0.0}
+                   'epsilon_greedy': 0.2}
 
 
 def build_new_agent(params=None):

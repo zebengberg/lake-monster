@@ -9,10 +9,9 @@ import numpy as np
 def build_df():
   """Use tf logs to build DataFrame containing monster speeds."""
   log_data = glob.glob('logs/events*')
-  speeds = []
-  episodes = []
-  scores = []
-  step_sizes = []
+  speeds = {}
+  scores = {}
+  sizes = {}
   for path in log_data:
     # not yet implemented in v2?
     data_from_path = tf.compat.v1.train.summary_iterator(path)
@@ -21,18 +20,19 @@ def build_df():
         if v.tag == 'monster_speed':
           speed = tf.make_ndarray(v.tensor).item()
           step = e.step
-          speeds.append(speed)
-          episodes.append(step)
+          speeds[step] = speed
+
         elif v.tag == 'learning_score':
           score = tf.make_ndarray(v.tensor).item()
-          scores.append(score)
+          step = e.step
+          scores[step] = score
         elif v.tag == 'step_size':
           size = tf.make_ndarray(v.tensor).item()
-          step_sizes.append(size)
+          step = e.step
+          sizes[step] = size
 
-  df = pd.DataFrame({'episode': episodes, 'speed': speeds,
-                     'score': scores, 'step_size': step_sizes})
-  df.set_index('episode', inplace=True)
+  df = pd.DataFrame({'speed': speeds, 'score': scores, 'step_size': sizes})
+  # df.set_index('episode', inplace=True)
   df.sort_index(inplace=True)
   return df
 
@@ -47,7 +47,7 @@ def is_progress_made():
 
   # the log approximates how many step_size reductions have been made
   num_reductions = np.log(initial_step_size / current_step_size)
-  num_episodes = int(2 * 1e4 * (num_reductions + 1))
+  num_episodes = int(4 * 1e4 * (num_reductions + 1))
 
   # only looking at entries with step_size equal to current value
   df = df[df['step_size'] == current_step_size]

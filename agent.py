@@ -27,8 +27,8 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 # a few constant global variables
 EVAL_INTERVAL = 10
-SAVE_INTERVAL = 200
-VIDEO_INTERVAL = 2000
+SAVE_INTERVAL = 100
+VIDEO_INTERVAL = 1000
 NUM_EVALS = SAVE_INTERVAL // EVAL_INTERVAL
 SUCCESS_SYMBOL = '$'
 FAIL_SYMBOL = '|'
@@ -61,9 +61,8 @@ class Agent:
           timeout_factor=3,
           fc_layer_params=(100,),
           dropout_layer_params=None,
-          learning_rate=1e-3,
-          epsilon_greedy=0.1,
-          penalty_per_step=0.0):
+          learning_rate=1e-2,
+          epsilon_greedy=0.1):
 
     self.num_actions = num_actions
     self.timeout_factor = timeout_factor
@@ -71,7 +70,6 @@ class Agent:
     self.dropout_layer_params = dropout_layer_params
     self.learning_rate = learning_rate
     self.epsilon_greedy = epsilon_greedy
-    self.penalty_per_step = penalty_per_step
 
     # variable for determining learning target mastery
     self.learning_score = 0
@@ -148,8 +146,7 @@ class Agent:
     params = {'monster_speed': self.monster_speed.numpy().item(),
               'timeout_factor': self.timeout_factor,
               'step_size': self.step_size.numpy().item(),
-              'num_actions': self.num_actions,
-              'penalty_per_step': self.penalty_per_step}
+              'num_actions': self.num_actions}
     py_train_env = LakeMonsterEnvironment(**params)
     tf_train_env = tf_py_environment.TFPyEnvironment(py_train_env)
     py_eval_env = LakeMonsterEnvironment(**params)
@@ -221,8 +218,7 @@ class Agent:
     metadata = {'monster_speed': self.monster_speed,  # already tf.Variable
                 'step_size': self.step_size,  # already tf.Variable
                 'timeout_factor': tf.Variable(self.timeout_factor),
-                'num_actions': tf.Variable(self.num_actions),
-                'penalty_per_step': tf.Variable(self.penalty_per_step)}
+                'num_actions': tf.Variable(self.num_actions)}
     saver = policy_saver.PolicySaver(self.agent.policy,
                                      train_step=step,
                                      metadata=metadata,
@@ -259,13 +255,13 @@ class Agent:
       if self.monster_speed.numpy().item() >= 3.0:
         self.monster_speed.assign_add(0.02)
       else:
-        self.monster_speed.assign_add(0.05)
+        self.monster_speed.assign_add(0.04)
       self.reset()
 
-    elif not is_progress_made():  # if no progress, reduce step size
-      print("No progress has been made! The agent's step size is decreasing.")
-      self.step_size.assign(tf.multiply(self.step_size, 0.5))
-      self.reset()
+    # elif not is_progress_made():  # if no progress, reduce step size
+    #   print("No progress has been made! The agent's step size is decreasing.")
+    #   self.step_size.assign(tf.multiply(self.step_size, 0.5))
+    #   self.reset()
 
   def run_eval(self, step):
     """Evaluate agent and print out key statistics."""

@@ -61,7 +61,6 @@ def test_agent(params=None):
   n = a.tf_train_env.action_spec().maximum - a.tf_train_env.action_spec().minimum
   assert n + 1 == a.num_actions
   assert a.py_eval_env.timeout_factor == a.timeout_factor
-  assert a.py_eval_env.penalty_per_step == a.penalty_per_step
 
 
 if __name__ == '__main__':

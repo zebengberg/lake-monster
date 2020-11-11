@@ -53,7 +53,7 @@ def arrow_segments(vector):
 
 
 def renderer(monster_angle, prev_monster_angle, position, prev_action_vector,
-             result, step, monster_speed, num_actions, step_size):
+             result, reward, step, monster_speed, num_actions, step_size):
   """Render an environment state as a PIL image."""
 
   c, s = np.cos(monster_angle), np.sin(monster_angle)
@@ -92,6 +92,8 @@ def renderer(monster_angle, prev_monster_angle, position, prev_action_vector,
   # displaying the episode result
   if result is not None:
     draw.text((CENTER - 10, CENTER + 30), result.upper(), (255, 255, 255))
+    reward = round(reward, 3)
+    draw.text((CENTER - 10, CENTER + 50), f'REWARD: {reward}', (255, 255, 255))
 
   return im
 
@@ -115,10 +117,11 @@ def episode_as_video(py_env, policy, filename, tf_env=None):
       video.append_data(py_env.render())
 
   # giving video file a more descriptive name
-  _, result = py_env.determine_reward()
+  reward, result = py_env.determine_reward()
+  reward = f'{reward:.3f}'
   if not os.path.exists('videos/'):
     os.mkdir('videos/')
-  filename = os.path.join('videos/', filename + '-' + result + '.mp4')
+  filename = os.path.join('videos/', filename + '-' + result + reward + '.mp4')
   os.rename('tmp.mp4', filename)
   print(f'Video created and saved as {filename}')
 

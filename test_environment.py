@@ -5,8 +5,10 @@ from tqdm import tqdm
 import numpy as np
 from tf_agents.environments import utils, tf_py_environment
 from tf_agents.policies import random_py_policy, random_tf_policy
+import imageio
 from environment import LakeMonsterEnvironment
 from renderer import episode_as_video
+
 
 TEST_VIDEO_FILENAME = 'test'
 
@@ -98,6 +100,28 @@ def test_video():
   episode_as_video(py_env=env, policy=policy, filename=TEST_VIDEO_FILENAME)
 
 
+def test_movement():
+  """Test strong movements on fast monster."""
+  print('Creating vide of pre-programmed strong monster.')
+  params = {'num_actions': 6,
+            'step_size': 0.1,
+            'monster_speed': 3.5,
+            'timeout_factor': 3}
+  env = LakeMonsterEnvironment(**params)
+  fps = 10
+  actions = [1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 3, 3, 2, 2, 4]
+  path = 'videos/strong_test.mp4'
+  with imageio.get_writer(path, fps=fps) as video:
+    time_step = env.reset()
+    video.append_data(env.render())
+    while not time_step.is_last():
+      action = actions.pop()
+      time_step = env.step(action)
+      video.append_data(env.render())
+    video.append_data(env.render())
+  print(f'Video created and saved as {path}')
+
+
 if __name__ == '__main__':
   print('\n' + '#' * 80)
   validate_environment()
@@ -107,5 +131,6 @@ if __name__ == '__main__':
   test_tf_environment_with_random()
   print('\n' + '#' * 80)
   test_video()
+  test_movement()
   print('\n' + '#' * 80)
   print('All tests pass.')
