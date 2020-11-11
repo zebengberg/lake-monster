@@ -14,7 +14,8 @@ param_universe = {
     'learning_rate': [0.1, 0.01, 0.001],
     'epsilon_greedy': [0.3, 0.1, 0.03],
     'penalty_per_step': [0, 0.01, 0.1],
-    'dropout_layer_params': [None, (0.1, 0.1), (0.4, 0.4)]
+    'dropout_layer_params': [None, (0.1, 0.1), (0.4, 0.4)],
+    'n_step_update': [1, 5, 10],
 }
 
 

@@ -25,7 +25,8 @@ handmade_params = {'num_actions': 6,
                    'fc_layer_params': (20, 20),
                    'dropout_layer_params': (0.1, 0.1),
                    'learning_rate': 0.01,
-                   'epsilon_greedy': 0.2}
+                   'epsilon_greedy': 0.2,
+                   'n_step_update': 10}
 
 
 def build_new_agent(params=None):

@@ -91,9 +91,9 @@ def renderer(monster_angle, prev_monster_angle, position, prev_action_vector,
 
   # displaying the episode result
   if result is not None:
-    draw.text((CENTER - 10, CENTER + 30), result.upper(), (255, 255, 255))
-    reward = round(reward, 3)
-    draw.text((CENTER - 10, CENTER + 50), f'REWARD: {reward}', (255, 255, 255))
+    white = (255,) * 3
+    draw.text((CENTER - 10, CENTER + 30), result.upper(), white)
+    draw.text((CENTER - 10, CENTER + 50), f'REWARD: {reward:.2f}', white)
 
   return im
 
@@ -117,11 +117,10 @@ def episode_as_video(py_env, policy, filename, tf_env=None):
       video.append_data(py_env.render())
 
   # giving video file a more descriptive name
-  reward, result = py_env.determine_reward()
-  reward = f'{reward:.3f}'
+  _, result = py_env.determine_reward()
   if not os.path.exists('videos/'):
     os.mkdir('videos/')
-  filename = os.path.join('videos/', filename + '-' + result + reward + '.mp4')
+  filename = os.path.join('videos/', filename + '-' + result + '.mp4')
   os.rename('tmp.mp4', filename)
   print(f'Video created and saved as {filename}')
 

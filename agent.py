@@ -62,7 +62,8 @@ class Agent:
           fc_layer_params=(100,),
           dropout_layer_params=None,
           learning_rate=1e-2,
-          epsilon_greedy=0.1):
+          epsilon_greedy=0.1,
+          n_step_update=1):
 
     self.num_actions = num_actions
     self.timeout_factor = timeout_factor
@@ -70,9 +71,11 @@ class Agent:
     self.dropout_layer_params = dropout_layer_params
     self.learning_rate = learning_rate
     self.epsilon_greedy = epsilon_greedy
+    self.n_step_update = n_step_update
 
     # variable for determining learning target mastery
     self.learning_score = 0
+    self.reward_sum = 0
 
     # summary writer for tensorboard
     self.writer = tf.summary.create_file_writer('logs/')
@@ -111,6 +114,7 @@ class Agent:
     agent = dqn_agent.DqnAgent(
         tf_temp_env.time_step_spec(),
         tf_temp_env.action_spec(),
+        n_step_update=self.n_step_update,
         q_network=q_net,
         optimizer=optimizer,
         epsilon_greedy=self.epsilon_greedy,
@@ -164,7 +168,8 @@ class Agent:
     dataset = self.replay_buffer.as_dataset(
         num_parallel_calls=3,
         sample_batch_size=self.batch_size,  # not sure!
-        num_steps=2).prefetch(3)
+        num_steps=self.agent.train_sequence_length
+    ).prefetch(3)
     iterator = iter(dataset)
     return driver, iterator
 
@@ -190,6 +195,7 @@ class Agent:
       tf.summary.scalar('monster_speed', self.monster_speed, step)
       tf.summary.scalar('step_size', self.step_size, step)
       tf.summary.scalar('learning_score', self.learning_score, step)
+      tf.summary.scalar('reward_sum', self.reward_sum, step)
       for i, layer in enumerate(self.q_net.layers[0].get_weights()):
         tf.summary.histogram(f'layer{i}', layer, step)
       for i, layer in enumerate(self.q_net.layers[1].get_weights()):
@@ -210,20 +216,20 @@ class Agent:
     if tried_to_interrupt:
       raise KeyboardInterrupt
 
-  def save_policy(self):
+  def save_policy(self, step):
     """Save strong policy with tf-agent PolicySaver."""
     print('Saving a strong policy.')
     # saving environment params as metadata in order to reconstruct environment
-    step = self.agent.train_step_counter
+
     metadata = {'monster_speed': self.monster_speed,  # already tf.Variable
                 'step_size': self.step_size,  # already tf.Variable
                 'timeout_factor': tf.Variable(self.timeout_factor),
                 'num_actions': tf.Variable(self.num_actions)}
     saver = policy_saver.PolicySaver(self.agent.policy,
-                                     train_step=step,
+                                     train_step=self.agent.train_step_counter,
                                      metadata=metadata,
                                      batch_size=None)
-    dir_name = f'{self.uid.numpy().decode()}-{step.numpy().item()}'
+    dir_name = f'{self.uid.numpy().decode()}-{step}'
     filepath = os.path.join('policies', dir_name)
     saver.save(filepath)
     print('Policy saved.')
@@ -238,19 +244,22 @@ class Agent:
       df = build_df()
       log_results(self.uid.numpy().decode(), df.to_dict(orient='list'))
 
-    self.check_mastery()
+    self.check_mastery(step)
     print(f'Completed {step} training episodes.')
-    print(f'Monster speed: {round(self.monster_speed.numpy().item(), 3)}.')
-    print(f'Step size: {round(self.step_size.numpy().item(), 2)}.')
+    print(f'Monster speed: {self.monster_speed.numpy().item():.3f}.')
+    print(f'Step size: {self.step_size.numpy().item():.2f}.')
     print(f'Score over evaluation period: {self.learning_score} / {NUM_EVALS}')
+    print(
+        f'Avg reward over evaluation period: {self.reward_sum / NUM_EVALS:.3f}')
     self.learning_score = 0
+    self.reward_sum = 0
     print('_' * 80)
 
-  def check_mastery(self):
+  def check_mastery(self, step):
     """Determine if policy is sufficiently strong to tweak monster_speed, step_size."""
     if self.learning_score >= 0.8 * NUM_EVALS:  # threshold 80%
       if self.monster_speed.numpy().item() >= 3.0:  # only strong policies!
-        self.save_policy()
+        self.save_policy(step)
       print('Agent is very smart. Increasing monster speed ...')
       if self.monster_speed.numpy().item() >= 3.0:
         self.monster_speed.assign_add(0.02)
@@ -258,15 +267,17 @@ class Agent:
         self.monster_speed.assign_add(0.04)
       self.reset()
 
-    # elif not is_progress_made():  # if no progress, reduce step size
-    #   print("No progress has been made! The agent's step size is decreasing.")
-    #   self.step_size.assign(tf.multiply(self.step_size, 0.5))
-    #   self.reset()
+    elif not is_progress_made():  # if no progress, reduce step size
+      print('No progress has recently been made!')
+      print("The agent's step size is decreasing.")
+      self.step_size.assign(tf.multiply(self.step_size, 0.5))
+      self.reset()
 
   def run_eval(self, step):
     """Evaluate agent and print out key statistics."""
     # tracking some statistics every evaluation
     reward, n_steps = self.evaluate_agent()
+    self.reward_sum += reward
     tf.summary.scalar('reward', reward, step)
     tf.summary.scalar('n_env_steps', n_steps, step)
 
@@ -280,14 +291,14 @@ class Agent:
     """Train the agent until interrupted by user."""
 
     print_legend()
+
     while True:
       train_step = self.agent.train_step_counter.numpy().item()
-      self.driver.run()  # run a single episode
+      self.driver.run()
       experience, _ = next(self.iterator)
       self.agent.train(experience)
 
       if train_step % SAVE_INTERVAL == 0:
         self.run_save(train_step)
-
       if train_step % EVAL_INTERVAL == 0:
         self.run_eval(train_step)
