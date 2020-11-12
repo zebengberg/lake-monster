@@ -28,7 +28,7 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 # a few constant global variables
 EVAL_INTERVAL = 10
 SAVE_INTERVAL = 100
-VIDEO_INTERVAL = 1000
+VIDEO_INTERVAL = 100
 NUM_EVALS = SAVE_INTERVAL // EVAL_INTERVAL
 SUCCESS_SYMBOL = '$'
 FAIL_SYMBOL = '|'
@@ -49,7 +49,7 @@ def print_legend():
 class Agent:
   """A class to hold global variables for tf_agent training."""
   # hyperparameters
-  replay_buffer_max_length = 100000
+  replay_buffer_max_length = 1_000_000
   batch_size = 64
 
   def __init__(
@@ -261,17 +261,27 @@ class Agent:
       if self.monster_speed.numpy().item() >= 3.0:  # only strong policies!
         self.save_policy(step)
       print('Agent is very smart. Increasing monster speed ...')
-      if self.monster_speed.numpy().item() >= 3.0:
+      if self.monster_speed.numpy().item() >= 3.4:
+        self.monster_speed.assign_add(0.01)
+      elif self.monster_speed.numpy().item() >= 3.0:
         self.monster_speed.assign_add(0.02)
       else:
         self.monster_speed.assign_add(0.04)
       self.reset()
 
-    elif not is_progress_made():  # if no progress, reduce step size
-      print('No progress has recently been made!')
-      print("The agent's step size is decreasing.")
-      self.step_size.assign(tf.multiply(self.step_size, 0.5))
+    if step == 100_000:
+      self.step_size.assign(0.05)
       self.reset()
+
+    elif step == 200_000:
+      self.step_size.assign(0.02)
+      self.reset()
+
+    # elif not is_progress_made():  # if no progress, reduce step size
+    #   print('No progress has recently been made!')
+    #   print("The agent's step size is decreasing.")
+    #   self.step_size.assign(tf.multiply(self.step_size, 0.5))
+    #   self.reset()
 
   def run_eval(self, step):
     """Evaluate agent and print out key statistics."""

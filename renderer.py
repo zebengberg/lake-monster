@@ -53,7 +53,7 @@ def arrow_segments(vector):
 
 
 def renderer(monster_angle, prev_monster_angle, position, prev_action_vector,
-             result, reward, step, monster_speed, num_actions, step_size):
+             result, reward, step, monster_speed, num_actions, step_size, is_caught):
   """Render an environment state as a PIL image."""
 
   c, s = np.cos(monster_angle), np.sin(monster_angle)
@@ -67,33 +67,39 @@ def renderer(monster_angle, prev_monster_angle, position, prev_action_vector,
                fill=(0, 0, 255), outline=(0, 0, 0), width=4)
   draw.ellipse((CENTER - 2,) * 2 + (CENTER + 2,) * 2, fill=(0, 0, 0))
 
-  draw.rectangle(coords_to_rect(real_position), fill=(250, 50, 0))
-  draw.rectangle(angle_to_rect(monster_angle), fill=(40, 200, 40))
+  draw.ellipse(coords_to_rect(real_position), fill=(250, 50, 0))
+  draw.ellipse(angle_to_rect(monster_angle), fill=(40, 200, 40))
 
   monster_text = f'MONSTER SPEED: {monster_speed}'
   step_text = f'STEP: {step}'
+  radius_text = f'RADIUS: {np.linalg.norm(position):.3f}'
   actions_text = f'NUMBER OF ACTIONS: {num_actions}'
   size_text = f'STEP SIZE: {step_size}'
   draw.text((10, SIZE - 20), monster_text, (0, 0, 0))
   draw.text((10, SIZE - 40), actions_text, (0, 0, 0))
   draw.text((10, SIZE - 60), size_text, (0, 0, 0))
   draw.text((CENTER - 20, SIZE - 20), step_text, (0, 0, 0))
+  draw.text((CENTER + 80, SIZE - 20), radius_text, (0, 0, 0))
 
   # drawing the arrow
   if prev_action_vector is not None:
+    if is_caught:
+      color = (255, 150, 0)
+    else:
+      color = (255, 255, 0)
     c, s = np.cos(prev_monster_angle), np.sin(prev_monster_angle)
     prev_rot_matrix = np.array(((c, -s), (s, c)))
     real_vector = np.dot(prev_rot_matrix, prev_action_vector)
     unit_vector = real_vector / np.linalg.norm(real_vector)
     lines = arrow_segments(unit_vector)
     for line in lines:
-      draw.line(line, fill=(255, 255, 0), width=4)
+      draw.line(line, fill=color, width=4)
 
   # displaying the episode result
   if result is not None:
     white = (255,) * 3
     draw.text((CENTER - 10, CENTER + 30), result.upper(), white)
-    draw.text((CENTER - 10, CENTER + 50), f'REWARD: {reward:.2f}', white)
+    draw.text((CENTER - 10, CENTER + 50), f'REWARD: {reward:.3f}', white)
 
   return im
 

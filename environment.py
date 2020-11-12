@@ -106,6 +106,8 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     self._episode_ended = False
     self.position = np.array((0.0, 0.0), dtype=np.float32)
     self.num_steps = 0
+    self.highest_r_attained = 0.0
+    self.is_monster_caught_up = False
     self.monster_angle = 0.0
     self.prev_action_vector = None
     return time_step.restart(self._state)
@@ -146,7 +148,11 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
 
     action_vector = self.step_size * self.action_to_direction[action]
     self.prev_action_vector = action_vector
+    prev_position = self.position
     self.position += action_vector
+    # if
+    # if self.position[1] == 0.0 and self.position[0] > 0:
+    #   self.is_monster_caught_up = True
     self.rotate()
     self.num_steps += 1
 
@@ -164,6 +170,8 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     if not self._episode_ended:
       raise ValueError('Episode has not ended, but determine_reward is called')
 
+    # TODO: include class attribute indicating if environment should give
+    # involved reward
     if self.r >= 1.0:
       if round(self.position[1], 6) == 0.0 and self.position[0] > 0:
         return self.highest_r_attained, 'capture'
@@ -186,7 +194,8 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
               'step': self.num_steps,
               'monster_speed': self.monster_speed,
               'num_actions': self.num_actions,
-              'step_size': self.step_size}
+              'step_size': self.step_size,
+              'is_caught': self.is_monster_caught_up}
     im = renderer(**params)
     if mode == 'rgb_array':
       return np.array(im)

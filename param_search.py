@@ -73,6 +73,6 @@ def log_results(uid, results):
   data[uid]['results'] = results
 
   with open('results.json', 'w') as f:
-    json.dump(data, f)
+    json.dump(data, f, indent=2)
   # remove backup copy
   os.remove('backup.json')
