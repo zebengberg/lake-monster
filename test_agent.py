@@ -42,17 +42,14 @@ def test_agent(params=None):
   a = Agent(**params)
   print('Summary of underlying neural network:')
   a.q_net.summary()
-  assert len(a.q_net.layers) == 2
 
   assert a.agent._optimizer.get_config()['learning_rate'] == a.learning_rate
 
-  # layers is list of all layers except for final output layer
-  layers = a.q_net.layers[0].get_weights()
-  for i, l in enumerate(layers):
-    if i % 2 == 0:
-      assert l.shape[1] == a.fc_layer_params[i // 2]
-  final_layer = a.q_net.layers[1].get_weights()
-  assert final_layer[0].shape[1] == a.num_actions
+  # neural network layer shapes
+  weights = [w for layers in a.q_net.layers for w in layers.get_weights()]
+  for arr, size in zip(weights[::2], a.fc_layer_params):
+    assert arr.shape[1] == size
+  assert weights[-2].shape[1] == a.num_actions * a.q_net.num_atoms
 
   # agent parameters
   assert a.agent._epsilon_greedy == a.epsilon_greedy

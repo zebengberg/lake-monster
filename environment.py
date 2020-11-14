@@ -32,13 +32,15 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
   def __init__(self, monster_speed=1.0,
                timeout_factor=3,
                step_size=0.1,
-               num_actions=4):
+               num_actions=4,
+               use_mini_rewards=False):
     super().__init__()
 
     self.monster_speed = round(monster_speed, 3)
     self.timeout_factor = timeout_factor
     self.step_size = round(step_size, 2)
     self.num_actions = num_actions
+    self.use_mini_rewards = use_mini_rewards
 
     # total number of allowed steps
     self.duration = int(timeout_factor / step_size)
@@ -170,14 +172,13 @@ class LakeMonsterEnvironment(py_environment.PyEnvironment):
     if not self._episode_ended:
       raise ValueError('Episode has not ended, but determine_reward is called')
 
-    # TODO: include class attribute indicating if environment should give
-    # involved reward
     if self.r >= 1.0:
       if round(self.position[1], 6) == 0.0 and self.position[0] > 0:
-        return self.highest_r_attained, 'capture'
-      return 2 + abs(self.theta), 'success'
-    # worse penalty for timeout than capture
-    return self.highest_r_attained - 0.2, 'timeout'
+        return int(self.use_mini_rewards) * self.highest_r_attained, 'capture'
+      return 1 + int(self.use_mini_rewards) * abs(self.theta), 'success'
+
+    # slightly worse penalty for timeout than capture
+    return int(self.use_mini_rewards) * self.highest_r_attained - 0.1, 'timeout'
 
   def render(self, mode='rgb_array'):
     # determine if episode just ended

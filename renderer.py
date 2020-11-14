@@ -147,4 +147,6 @@ def episode_as_gif(py_env, policy, filepath, fps=30, tf_env=None):
       time_step = tf_env.step(action.action)
       policy_state = action.state
       gif.append_data(py_env.render())
+    for _ in range(fps):  # play for 1 more seconds
+      gif.append_data(py_env.render())
   pygifsicle.optimize(filepath)

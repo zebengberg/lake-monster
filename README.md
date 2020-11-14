@@ -13,6 +13,10 @@
 
 You find yourself in the middle of a circular lake in a rowboat. Glancing toward the shore, you spot a monster watching your every move. You start to row away from the monster. It runs along the circumference, tracking you, always aiming for the point on the shore closest to you. You know that once you get to the shore, you'll be able to out run the monster. However, stuck on the water, the monster is clearly faster than you. If you pick the optimal path to the shore, is it possible to escape? More precisely, how many times faster than you can the monster move so that you can still find a way to escape?
 
+|   ![random policy](assets/capture.gif)    |
+| :---------------------------------------: |
+| _An agent that is eaten by the monster!._ |
+
 This [lake-monster problem](http://datagenetics.com/blog/october12013/index.html) is a classic mathematical riddle involving basic geometry and calculus. Determining the optimal path to the shore and calculating the monster's maximal speed under which you can escape is tricky. The [shape of the optimal path](https://puzzling.stackexchange.com/a/2161) is complex, involving several distinct stages. In short, although the solution to the problem is well understood mathematically, it is difficult to describe with simple geometric motions. For these reasons, the lake-monster problems makes an excellent testing ground for reinforcement learning.
 
 Reinforcement learning (RL) is a machine learning framework in which an _agent_ interacts with an _environment_ in hopes of maximizing some long-term _reward_. In RL, the agent observes its environment at discrete time steps. Using its decision making _policy_, the agent chooses an _action_ to take within the environment. The environment may change in response to the agent's action, resulting in a new observation at the following time step. This observation -- action cycle continues until some terminal environment state is encountered. The agent seeks to maximize the reward it obtains from its trajectory within the environment. One full trajectory is known as an _episode_.
@@ -95,6 +99,10 @@ The agent receives a positive reward if it successfully escapes from the lake wi
 greedy vs exploration
 
 ## Results
+
+|           ![strong policy](assets/strong.gif)            |
+| :------------------------------------------------------: |
+| _An agent demonstrating highly complex learned actions._ |
 
 ### Parameters
 

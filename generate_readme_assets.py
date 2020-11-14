@@ -32,34 +32,49 @@ def create_action_gif():
                  filepath='assets/actions.gif', fps=1)
 
 
-def create_policy_gif(dirpath=None):
+def create_policy_gif(policy_path=None, asset_path=None, new_params=None):
   """Create a gif showing a saved policy in action."""
 
-  if dirpath is None:  # choosing the first one available
+  if policy_path is None:  # choosing any available policy
     policies = os.listdir('policies')
     if policies:
-      dirpath = os.path.join('policies', policies[0])
-      print(dirpath)
+      policy_path = os.path.join('policies', policies[0])
     else:
-      print('No policies to show.')
+      raise FileNotFoundError('No policies to show.')
 
-  if dirpath is not None:
-    policy = tf.saved_model.load(dirpath)
-    env_params = policy.get_metadata()
-    for k, v in env_params.items():
-      # casting from tf.Variable to python native
-      env_params[k] = v.numpy().item()
-    print('Creating a gif with environment parameters:')
-    print(env_params)
+  policy = tf.saved_model.load(policy_path)
+  env_params = policy.get_metadata()
+  for k, v in env_params.items():
+    # casting from tf.Variable to python native
+    env_params[k] = v.numpy().item()
 
-    py_env = LakeMonsterEnvironment(**env_params)
-    tf_env = tf_py_environment.TFPyEnvironment(py_env)
-    episode_as_gif(py_env, policy, 'assets/policy1.gif', tf_env=tf_env, fps=5)
+  # overwriting some parameters
+  if new_params:
+    for k, v in new_params.items():
+      env_params[k] = v
+
+  print('Creating a gif with environment parameters:')
+  print(env_params)
+
+  py_env = LakeMonsterEnvironment(**env_params)
+  tf_env = tf_py_environment.TFPyEnvironment(py_env)
+  if asset_path is None:
+    asset_path = 'assets/policy.gif'
+  episode_as_gif(py_env, policy, asset_path, tf_env=tf_env, fps=10)
 
 
 if __name__ == '__main__':
   if not os.path.exists('assets/'):
     os.mkdir('assets')
-  create_random_gif()
-  create_action_gif()
-  create_policy_gif()
+  # create_random_gif()
+  # create_action_gif()
+
+  p_path = 'policies/87497411048514251456633633962304499656-83200'
+  a_path = 'assets/capture.gif'
+  params = {'step_size': 0.02, 'monster_speed': 3.8}
+  create_policy_gif(p_path, a_path, params)
+
+  p_path = 'policies/87497411048514251456633633962304499656-172100'
+  a_path = 'assets/strong.gif'
+  params = {'step_size': 0.01, 'monster_speed': 4.2}
+  create_policy_gif(p_path, a_path, params)

@@ -20,13 +20,15 @@ def launch_tb():
 
 handmade_params = {'num_actions': 12,
                    'initial_step_size': 0.1,
-                   'initial_monster_speed': 3.5,
+                   'initial_monster_speed': 3.50,
                    'timeout_factor': 3,
                    'fc_layer_params': (50, 50),
-                   'dropout_layer_params': (0.1, 0.1),
-                   'learning_rate': 0.01,
-                   'epsilon_greedy': 0.05,
-                   'n_step_update': 30}
+                   'dropout_layer_params': None,
+                   'learning_rate': 0.0005,
+                   'epsilon_greedy': 0.1,
+                   'n_step_update': 30,
+                   'use_categorical': True,
+                   'use_mini_rewards': True}
 
 
 def build_new_agent(params=None):
@@ -35,8 +37,8 @@ def build_new_agent(params=None):
   if params is None:
     params = get_random_params()
 
-  test_agent(params)
-  log_graph(params)
+  # test_agent(params)
+  # log_graph(params)
   log_uid(uid)
   log_params(uid, params)
   return Agent(uid, **params)

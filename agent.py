@@ -6,8 +6,9 @@ import warnings
 import absl.logging
 import tensorflow as tf
 from tf_agents.agents.dqn import dqn_agent
+from tf_agents.agents.categorical_dqn import categorical_dqn_agent
 from tf_agents.environments import tf_py_environment
-from tf_agents.networks import q_network
+from tf_agents.networks import q_network, categorical_q_network
 from tf_agents.utils import common
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from tf_agents.drivers import dynamic_episode_driver
@@ -28,7 +29,7 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 # a few constant global variables
 EVAL_INTERVAL = 10
 SAVE_INTERVAL = 100
-VIDEO_INTERVAL = 100
+VIDEO_INTERVAL = 1000
 NUM_EVALS = SAVE_INTERVAL // EVAL_INTERVAL
 SUCCESS_SYMBOL = '$'
 FAIL_SYMBOL = '|'
@@ -61,9 +62,11 @@ class Agent:
           timeout_factor=3,
           fc_layer_params=(100,),
           dropout_layer_params=None,
-          learning_rate=1e-2,
+          learning_rate=0.001,
           epsilon_greedy=0.1,
-          n_step_update=1):
+          n_step_update=1,
+          use_categorical=False,
+          use_mini_rewards=False):
 
     self.num_actions = num_actions
     self.timeout_factor = timeout_factor
@@ -72,6 +75,7 @@ class Agent:
     self.learning_rate = learning_rate
     self.epsilon_greedy = epsilon_greedy
     self.n_step_update = n_step_update
+    self.use_mini_rewards = use_mini_rewards
 
     # variable for determining learning target mastery
     self.learning_score = 0
@@ -85,7 +89,10 @@ class Agent:
     self.uid = tf.Variable(uid, dtype=tf.string)
     self.monster_speed = tf.Variable(initial_monster_speed, dtype=tf.float64)
     self.step_size = tf.Variable(initial_step_size, dtype=tf.float64)
-    self.q_net, self.agent = self.build_agent()
+    if use_categorical:
+      self.q_net, self.agent = self.build_categorical_dqn_agent()
+    else:
+      self.q_net, self.agent = self.build_dqn_agent()
     self.replay_buffer = self.build_replay_buffer()
 
     self.checkpointer = self.build_checkpointer()
@@ -100,10 +107,11 @@ class Agent:
     self.tf_train_env, self.py_eval_env, self.tf_eval_env = self.build_envs()
     self.driver, self.iterator = self.build_driver()
 
-  def build_agent(self):
+  def build_dqn_agent(self):
     """Build DQN agent with QNetwork."""
     py_temp_env = LakeMonsterEnvironment(num_actions=self.num_actions)
     tf_temp_env = tf_py_environment.TFPyEnvironment(py_temp_env)
+
     q_net = q_network.QNetwork(
         tf_temp_env.observation_spec(),
         tf_temp_env.action_spec(),
@@ -117,6 +125,35 @@ class Agent:
         n_step_update=self.n_step_update,
         q_network=q_net,
         optimizer=optimizer,
+        epsilon_greedy=self.epsilon_greedy,
+        td_errors_loss_fn=common.element_wise_squared_loss,
+        train_step_counter=tf.Variable(0, dtype=tf.int64))
+    agent.train = common.function(agent.train)
+
+    return q_net, agent
+
+  def build_categorical_dqn_agent(self):
+    """Build categorical DQN agent with CategoricalQNetwork."""
+    py_temp_env = LakeMonsterEnvironment(num_actions=self.num_actions)
+    tf_temp_env = tf_py_environment.TFPyEnvironment(py_temp_env)
+
+    if self.dropout_layer_params is not None:
+      raise AttributeError('CategoricalQNetwork does accept dropout layers.')
+
+    q_net = categorical_q_network.CategoricalQNetwork(
+        tf_temp_env.observation_spec(),
+        tf_temp_env.action_spec(),
+        fc_layer_params=self.fc_layer_params)
+
+    optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+    agent = categorical_dqn_agent.CategoricalDqnAgent(
+        tf_temp_env.time_step_spec(),
+        tf_temp_env.action_spec(),
+        n_step_update=self.n_step_update,
+        categorical_q_network=q_net,
+        optimizer=optimizer,
+        min_q_value=0.0,
+        max_q_value=3.0,
         epsilon_greedy=self.epsilon_greedy,
         td_errors_loss_fn=common.element_wise_squared_loss,
         train_step_counter=tf.Variable(0, dtype=tf.int64))
@@ -150,7 +187,8 @@ class Agent:
     params = {'monster_speed': self.monster_speed.numpy().item(),
               'timeout_factor': self.timeout_factor,
               'step_size': self.step_size.numpy().item(),
-              'num_actions': self.num_actions}
+              'num_actions': self.num_actions,
+              'use_mini_rewards': self.use_mini_rewards}
     py_train_env = LakeMonsterEnvironment(**params)
     tf_train_env = tf_py_environment.TFPyEnvironment(py_train_env)
     py_eval_env = LakeMonsterEnvironment(**params)
@@ -164,6 +202,10 @@ class Agent:
         env=self.tf_train_env,
         policy=self.agent.collect_policy,
         observers=observers)
+
+    # giving replay buffer some initial data
+    for _ in range(3):
+      driver.run()
 
     dataset = self.replay_buffer.as_dataset(
         num_parallel_calls=3,
@@ -196,10 +238,12 @@ class Agent:
       tf.summary.scalar('step_size', self.step_size, step)
       tf.summary.scalar('learning_score', self.learning_score, step)
       tf.summary.scalar('reward_sum', self.reward_sum, step)
-      for i, layer in enumerate(self.q_net.layers[0].get_weights()):
-        tf.summary.histogram(f'layer{i}', layer, step)
-      for i, layer in enumerate(self.q_net.layers[1].get_weights()):
-        tf.summary.histogram(f'final_layer{i}', layer, step)
+
+      # self.q_net.layers either has 1 or 2 elements depending on whether q_net
+      # is categorical or not
+      weights = [w for layers in self.q_net.layers for w in layers.get_weights()]
+      for i, w in enumerate(weights):
+        tf.summary.histogram(f'layer{i}', w, step)
       return True
 
     is_saved = False
@@ -257,7 +301,7 @@ class Agent:
 
   def check_mastery(self, step):
     """Determine if policy is sufficiently strong to tweak monster_speed, step_size."""
-    if self.learning_score >= 0.8 * NUM_EVALS:  # threshold 80%
+    if self.learning_score >= 0.9 * NUM_EVALS:  # threshold 90%
       if self.monster_speed.numpy().item() >= 3.0:  # only strong policies!
         self.save_policy(step)
       print('Agent is very smart. Increasing monster speed ...')
@@ -269,7 +313,7 @@ class Agent:
         self.monster_speed.assign_add(0.04)
       self.reset()
 
-    if step == 100_000:
+    if step == 82_000:
       self.step_size.assign(0.05)
       self.reset()
 
@@ -301,7 +345,6 @@ class Agent:
     """Train the agent until interrupted by user."""
 
     print_legend()
-
     while True:
       train_step = self.agent.train_step_counter.numpy().item()
       self.driver.run()
