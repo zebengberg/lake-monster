@@ -37,14 +37,14 @@ FAIL_SYMBOL = '|'
 
 def print_legend():
   """Print command line training legend."""
-  print('\n' + '#' * 80)
+  print('\n' + '#' * 65)
   print('          TRAINING LEGEND')
   print(SUCCESS_SYMBOL + ' = success on last evaluation episode')
   print(FAIL_SYMBOL + ' = failure on last evaluation episode')
   print(f'Evaluation occurs every {EVAL_INTERVAL} episodes')
   print(f'Progress is saved every {SAVE_INTERVAL} episodes')
   print(f'Videos are rendered every {VIDEO_INTERVAL} episodes')
-  print('#' * 80 + '\n')
+  print('#' * 65 + '\n')
 
 
 class Agent:
@@ -57,12 +57,12 @@ class Agent:
           uid,
           num_actions=8,
           initial_step_size=0.1,
-          initial_monster_speed=3.0,
+          initial_monster_speed=3.3,
           timeout_factor=3.0,
           use_mini_rewards=True,
           use_cartesian=False,
           use_noisy_start=False,
-          fc_layer_params=(20, 20),
+          fc_layer_params=(50, 50),
           dropout_layer_params=None,
           learning_rate=0.0005,
           epsilon_greedy=0.1,
@@ -122,7 +122,8 @@ class Agent:
 
   def build_dqn_agent(self):
     """Build DQN agent with QNetwork."""
-    py_temp_env = LakeMonsterEnvironment(num_actions=self.num_actions)
+    py_temp_env = LakeMonsterEnvironment(num_actions=self.num_actions,
+                                         use_cartesian=self.use_cartesian)
     tf_temp_env = TFPyEnvironment(py_temp_env)
 
     q_net = q_network.QNetwork(
@@ -146,7 +147,8 @@ class Agent:
 
   def build_categorical_dqn_agent(self):
     """Build categorical DQN agent with CategoricalQNetwork."""
-    py_temp_env = LakeMonsterEnvironment(num_actions=self.num_actions)
+    py_temp_env = LakeMonsterEnvironment(num_actions=self.num_actions,
+                                         use_cartesian=self.use_cartesian)
     tf_temp_env = TFPyEnvironment(py_temp_env)
 
     if self.dropout_layer_params is not None:
@@ -222,7 +224,7 @@ class Agent:
 
     dataset = self.replay_buffer.as_dataset(
         num_parallel_calls=3,
-        sample_batch_size=self.batch_size,  # not sure!
+        sample_batch_size=self.batch_size,
         num_steps=self.agent.train_sequence_length
     ).prefetch(3)
     iterator = iter(dataset)
@@ -293,38 +295,39 @@ class Agent:
 
   def run_save(self, step):
     """Call save_progress and print out key statistics."""
-    print('')
-    self.save_progress(step)
 
-    self.check_mastery(step)
+    self.save_progress(step)
+    if self.use_mastery:
+      self.check_mastery()
+    if self.use_step_schedule:
+      self.check_step_schedule(step)
+
     print(f'Completed {step} training episodes.')
     print(f'Monster speed: {self.monster_speed.numpy().item():.3f}.')
     print(f'Step size: {self.step_size.numpy().item():.2f}.')
-    print(f'Score over evaluation period: {self.learning_score} / {NUM_EVALS}')
-    print(
-        f'Avg reward over evaluation period: {self.reward_sum / NUM_EVALS:.3f}')
+    print(f'Score over eval period: {self.learning_score} / {NUM_EVALS}')
+    print(f'Avg reward over eval period: {self.reward_sum / NUM_EVALS:.3f}')
     self.learning_score = 0
     self.reward_sum = 0
-    print('_' * 80)
+    print('_' * 65)
 
-  def check_mastery(self, step):
-    """Determine if policy is sufficiently strong to tweak monster_speed, step_size."""
+  def check_mastery(self):
+    """Determine if policy is sufficiently strong to increase monster_speed."""
     if self.learning_score >= 0.9 * NUM_EVALS:  # threshold 90%
       print('Agent is very smart. Increasing monster speed ...')
-      if self.monster_speed.numpy().item() >= 3.4:
+      if tf.math.greater(self.monster_speed, 3.4):
         self.monster_speed.assign_add(0.01)
-      elif self.monster_speed.numpy().item() >= 3.0:
+      elif tf.math.greater(self.monster_speed, 3.0):
         self.monster_speed.assign_add(0.02)
       else:
         self.monster_speed.assign_add(0.04)
       self.reset()
 
-    if step == 100_000:
-      self.step_size.assign(0.05)
-      self.reset()
-
-    elif step == 200_000:
-      self.step_size.assign(0.02)
+  def check_step_schedule(self, step):
+    """Determine if step_size should be decreased."""
+    if step == 100_000 or step == 200_000:
+      print('Decreasing the step size according to the schedule.')
+      self.step_size.assign(tf.multiply(0.5, self.step_size))
       self.reset()
 
   def run_eval(self, step):
@@ -340,6 +343,8 @@ class Agent:
       self.learning_score += 1
     else:
       print(FAIL_SYMBOL, end='', flush=True)
+    if (step + EVAL_INTERVAL) % SAVE_INTERVAL == 0:
+      print('')
 
   def run_video(self, step):
     """Save a video and log results."""
@@ -354,10 +359,14 @@ class Agent:
     self.agent.train = common.function(self.agent.train)
     self.driver.run()
     self.driver.run()
-    self.driver.run()
-
+    self.agent.initialize()
     print_legend()
+
     while True:
+      self.driver.run()
+      experience, _ = next(self.iterator)
+      self.agent.train(experience)
+
       train_step = self.agent.train_step_counter.numpy().item()
       if train_step % POLICY_INTERVAL == 0:
         self.save_policy(train_step)
@@ -367,7 +376,3 @@ class Agent:
         self.run_save(train_step)
       if train_step % EVAL_INTERVAL == 0:
         self.run_eval(train_step)
-
-      self.driver.run()
-      experience, _ = next(self.iterator)
-      self.agent.train(experience)

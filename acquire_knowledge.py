@@ -15,6 +15,7 @@ def launch_tb():
   tb = tensorboard.program.TensorBoard()
   tb.configure(logdir='logs')
   url = tb.launch()
+  url += '#scalars&_smoothingWeight=0.95'
   webbrowser.open_new_tab(url)
 
 
@@ -26,9 +27,8 @@ def build_new_agent(use_random=False):
   else:
     params = {}
 
-  # TODO: fix this!!!
-  # test_agent(params)
-  # log_graph(params)
+  test_agent(uid, params)
+  log_graph(uid, params)
   log_uid(uid)
   log_params(uid, params)
   return Agent(uid, **params)
@@ -39,8 +39,7 @@ def restore_existing_agent():
   if not os.path.exists('agent_id.txt'):
     raise FileNotFoundError('Cannot find agent_id.txt')
   uid, params = read_params()
-  # TODO: fix this
-  # test_agent(params)
+  test_agent(uid, params)
   return Agent(uid, **params)
 
 
