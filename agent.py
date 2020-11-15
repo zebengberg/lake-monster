@@ -30,6 +30,7 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 EVAL_INTERVAL = 10
 SAVE_INTERVAL = 100
 VIDEO_INTERVAL = 1000
+POLICY_INTERVAL = 100
 NUM_EVALS = SAVE_INTERVAL // EVAL_INTERVAL
 SUCCESS_SYMBOL = '$'
 FAIL_SYMBOL = '|'
@@ -282,11 +283,6 @@ class Agent:
     """Call save_progress and print out key statistics."""
     print('')
     self.save_progress(step)
-    if step % VIDEO_INTERVAL == 0:
-      episode_as_video(self.py_eval_env, self.agent.policy,
-                       f'episode-{step}', self.tf_eval_env)
-      df = build_df()
-      log_results(self.uid.numpy().decode(), df.to_dict(orient='list'))
 
     self.check_mastery(step)
     print(f'Completed {step} training episodes.')
@@ -302,8 +298,6 @@ class Agent:
   def check_mastery(self, step):
     """Determine if policy is sufficiently strong to tweak monster_speed, step_size."""
     if self.learning_score >= 0.9 * NUM_EVALS:  # threshold 90%
-      if self.monster_speed.numpy().item() >= 3.0:  # only strong policies!
-        self.save_policy(step)
       print('Agent is very smart. Increasing monster speed ...')
       if self.monster_speed.numpy().item() >= 3.4:
         self.monster_speed.assign_add(0.01)
@@ -355,3 +349,10 @@ class Agent:
         self.run_save(train_step)
       if train_step % EVAL_INTERVAL == 0:
         self.run_eval(train_step)
+      if train_step % VIDEO_INTERVAL == 0:
+        episode_as_video(self.py_eval_env, self.agent.policy,
+                         f'episode-{train_step}', self.tf_eval_env)
+        log_results(self.uid.numpy().decode(),
+                    build_df().to_dict(orient='list'))
+      if train_step % POLICY_INTERVAL == 0:
+        self.save_policy(train_step)

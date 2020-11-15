@@ -4,32 +4,30 @@
 
 - [Introduction](#introduction)
 - [Installation and Usage](#installation-and-usage)
-- [Environment](#environment)
+- [Environment and Agent](#environment-and-agent)
 - [Learning](#learning)
 - [Results](#results)
 - [License](#license)
 
 ## Introduction
 
-You find yourself in the middle of a circular lake in a rowboat. Glancing toward the shore, you spot a monster watching your every move. You start to row away from the monster. It runs along the circumference, tracking you, always aiming for the point on the shore closest to you. You know that once you get to the shore, you'll be able to out run the monster. However, stuck on the water, the monster is clearly faster than you. If you pick the optimal path to the shore, is it possible to escape? More precisely, how many times faster than you can the monster move so that you can still find a way to escape?
+You find yourself in the middle of a circular lake in a rowboat. Glancing toward the shore, you spot a monster watching your every move. You start to row away from the monster. It runs along the circumference, tracking you, always aiming for the point on the shore closest to you. You know that once you get to the shore, you'll be able to out run the monster, avoiding death. However, stuck on the water, the monster is clearly faster than you. If you row in an optimal path to the shore, is it possible to escape? More precisely, how many times faster than you can the monster move so that you can manage to escape?
 
-|   ![random policy](assets/capture.gif)    |
-| :---------------------------------------: |
-| _An agent that is eaten by the monster!._ |
+|                ![capture](assets/capture.gif)                 |
+| :-----------------------------------------------------------: |
+| _An agent who cannot quite escape and eventually gets eaten._ |
 
-This [lake-monster problem](http://datagenetics.com/blog/october12013/index.html) is a classic mathematical riddle involving basic geometry and calculus. Determining the optimal path to the shore and calculating the monster's maximal speed under which you can escape is tricky. The [shape of the optimal path](https://puzzling.stackexchange.com/a/2161) is complex, involving several distinct stages. In short, although the solution to the problem is well understood mathematically, it is difficult to describe with simple geometric motions. For these reasons, the lake-monster problems makes an excellent testing ground for reinforcement learning.
+This [lake-monster problem](http://datagenetics.com/blog/october12013/index.html) is a classic mathematical riddle involving basic geometry and calculus. It is tricky to determine the optimal path to the shore and the maximal monster speed under which escape is possible. The [shape of the optimal path](https://puzzling.stackexchange.com/a/2161) is complex, involving several distinct stages. In short, although the solution to this problem is well understood mathematically, it is difficult to describe in simple geometric motions. For these reasons, the lake-monster problems provides a fertile testing ground for reinforcement learning algorithms.
 
-Reinforcement learning (RL) is a machine learning framework in which an _agent_ interacts with an _environment_ in hopes of maximizing some long-term _reward_. In RL, the agent observes its environment at discrete time steps. Using its decision making _policy_, the agent chooses an _action_ to take within the environment. The environment may change in response to the agent's action, resulting in a new observation at the following time step. This observation -- action cycle continues until some terminal environment state is encountered. The agent seeks to maximize the reward it obtains from its trajectory within the environment. One full trajectory is known as an _episode_.
+Reinforcement learning (RL) is a machine learning framework in which an _agent_ interacts with an _environment_ in hopes of maximizing some long-term _reward_. In RL, the agent observes its environment at discrete time steps. Using its decision making _policy_, the agent chooses an _action_ to take within the environment. The environment updates in response to the agent's action, resulting in a new observation at the following time step. This observation-action cycle continues until some terminal environment state is encountered. The agent seeks to maximize the reward it obtains from interacting the environment. One full trajectory from an initial state to a terminal state is known as an _episode_.
 
-The lake-monster problem readily adheres to the RL framework. The _environment_ consists of position of the monster and rowboat within the lake-shore geometry and the monster's speed. The _agent_ is the human in the rowboat, the _policy_ is the human's decision making process, and the _action_ is the direction in which to propel the rowboat. After an action is taken, the environment is updated as the monster runs across an arc of the lake's circumference in hopes of arriving at the human's intersection with the shore prior to the human arrival. The _episode_ is the sequence of actions resulting in the human's escape or capture.
-
-TODO: include gif of trained here
+The lake-monster problem readily adapts to the RL framework. The _environment_ consists of the rowboat situated within the lake and the monster running on the shore. The _agent_ is the human guiding the rowboat hoping to escape, the _policy_ is the human's decision making process, and the _action_ is the direction in which the human chooses to propel the rowboat. After an action is taken, the environment is updated as the monster runs across an arc of the lake's circumference in hopes getting closer to the tasty human. The _episode_ is the sequence of human actions resulting in the human's escape or capture.
 
 ## Installation and Usage
 
 This simulation was created with Python 3.8 using TensorFlow and TF-Agents.
 
-You can clone or download this repository locally. You may want to create a new Python environment to install the dependencies. This can be accomplished with `conda`.
+You can clone or download this repository locally. You may want to create a new Python environment to install the dependencies using an environment manager such as `conda`.
 
 ```sh
 conda create --name monster python=3.8
@@ -37,54 +35,45 @@ conda activate monster
 pip install -r requirements.txt
 ```
 
-Test the lake-monster environment by running `python test_environment.py`. This script will initialize an agent with a random policy to interact with several versions of `LakeMonsterEnvironment` and create a video showing an episode.
+Test the lake-monster environment by running `python test_environment.py`. This script will initialize a random policy to interact with `LakeMonsterEnvironment` (see [Environment](#environment-and-agent)) and create a sample video showing an episode. Test the TensorFlow-derived DQN-based agent framework by running `python test_agent.py`. This script will instantiate several `Agent` objects, print out network statistics, and run a few episodes using the TF-agent `dynamic_episode_driver` pipeline.
 
 |                ![random policy](assets/random.gif)                |
 | :---------------------------------------------------------------: |
 | _An agent with a random policy interacting with the environment._ |
 
-Train a DQN agent to learn to solve the lake-monster puzzle by running `python acquire_knowledge.py`. This module will periodically save several pieces training knowledge.
+After testing the basic components, you can train your very own agent to solve the lake-monster puzzle by running `python acquire_knowledge.py`. Default parameters are strong, and can be modified in the source code. See [Results](#results) for a discussion of parameter selection. As the agent learns, several pieces training knowledge are saved.
 
-- TensorFlow checkpoints, such as weights of the Q-learning neural network, are saved as binary files in the `checkpoints/` directory.
-- Training and environment statistics, such as reward, training loss, and number of environment steps, are saved in `stats.json`. Running `python stats.py` will display plots of the generated statistics.
+- TensorFlow checkpoints are saved in the `checkpoints/` directory. These checkpoints hold the current state of the agent and its associated TF-agent objects (such as the _replay buffer_). Training can be keyboard interrupted at any point in time and continued from the last saved checkpoint by re-running `acquire_knowledge.py`.
+- Training statistics are logged through `tf.summary` methods and saved in the `logs/` directory. Statistics are indexed by the episode number and include reward, training loss, number of environment steps taken by the agent, and network weights. These statistics can be viewed through TensorBoard (see images below), which automatically loads in a browser tab. In addition to displaying responsive plots, TensorBoard provides some tools for more detailed data analysis, such as the ability to export a time series as a CSV file.
 - Video renders of the agent interacting with the environment are periodically captured and stored within the `videos/` directory.
+- Agent policies are periodically time-stamped and saved in the `policies/` directory. Saved policies are slimmed-down checkpoints containing only hyperparameter values and network weights. They cannot be used for continuing agent training; instead, they demonstrate the actions of a learned policy.
+- Results across distinct agents are saved in `results.json`. The file `agent_id.txt` holds a UUID corresponding to a partially trained agent.
 
-Training can be keyboard interrupted at any point in training and continued from a saved checkpoint later on. This is handled automatically through the tf-agent `checkpointer` object and the `stats` module. Training hyperparameters and environment parameters can be directly specified in the `acquire_knowledge` script. See [Results](#results) for a discussion of parameter selection.
+Training knowledge can be reset by running `python clear_knowledge.py`. This script will clear the `checkpoints/`, `logs/`, and `videos/` directories, and remove the `agent_id.txt` file. This script should be run when training a new agent from scratch. Saved policies and items in `results.json` are not removed.
 
-Training knowledge can be completely reset by running `python clear_knowledge.py`.
+|                 ![loss](assets/loss.png)                 |             ![weights](assets/weights.png)             |
+| :------------------------------------------------------: | :----------------------------------------------------: |
+| _A loss statistic tracked over training in TensorBoard._ | _Offset histograms of the weights of a network layer._ |
 
 ## Environment and Agent
 
-The [environment](environment.py) module contains the `LakeMonsterEnvironment` class, defining the RL environment of the lake-monster problem. The `LakeMonsterEnvironment` inherits from `PyEnvironment`, an abstract base class within the tf-agents package used for building custom environments.
+The [environment](environment.py) module contains the `LakeMonsterEnvironment` class which defines the RL environment of the lake-monster problem. The `LakeMonsterEnvironment` inherits from `PyEnvironment`, an abstract base class within the TF-agents package used for building custom environments.
 
-The [agent](agent.py) module contains the `Agent` class, defining the DQN-agent which seeks to maximize its reward within the environment. The `Agent` class contains instances of many tf-agent objects used throughout the training process. Instance variables include training and evaluation environments (wrapped into TensorFlow objects), a replay buffer for enabling agent training, and several other objects needed within the tf-agent train data pipeline.
+The [agent](agent.py) module contains the `Agent` class. This defines the DQN-agent which seeks to maximize its reward within the environment. The `Agent` class contains instances of TF-agent objects used throughout the training process. Instance variables include training and evaluation environments (wrapped into TensorFlow objects), a replay buffer for enabling DQN learning, and several other objects needed within the TF-agent training pipeline.
 
-We represent the lake as a unit circle, the monster as a point on the circumference of that unit circle, and the agent as a point on the interior of the unit circle. Although the lake-monster problem deals with continuous motion, we discretize the problem in order to simulate it in a digital setting. In this implementation, discretizing the problem only gives additional advantages to the monster. After every step taken by the agent, the monster takes its own step. After taking a final step beyond the shoreline, the monster has one last chance to catch and eat the agent.
+We represent the lake as a unit circle, the monster as a point on the circumference of that unit circle, and the agent as a point in the interior of the unit circle. Although the lake-monster problem deals with continuous motion, we discretize the problem in order to simulate it in a DQN-setting. In this implementation, discretizing the problem only gives additional advantages to the monster: the agent has less freedom in its motion. After every step taken by the agent, the monster takes its own step. After taking a final step beyond the shoreline, the monster has one final chance to capture and eat the agent.
 
-To keep episodes of the environment finite, we impose a maximum number of steps that the agent is allowed to take. Once the agent exceed this threshold, the current episode terminates.
+At each time step, the agent has only finitely many actions to choose among (see [Action](#action)). Additionally, we impose a maximum number of steps that the agent is allowed to take. Once the agent exceed this threshold, the current episode terminates. Consequently, there are finitely many trajectories that the agent could take within the environment.
 
 ### State
 
-The state of the environment can be encapsulated in a single vector describing the position of the monster, the position of the agent, and the number of steps taken with the episode. Other parameters, such as the speed of the monster, the step size, and the space of possible agent actions could also be included within the state.
+The state of the environment can be encapsulated in a single vector describing the position of the monster, the position of the agent, and the number of steps taken with the current episode. Other parameters, such as the speed of the monster, the step size, and the space of possible agent actions could also be included within the state. We experiment with several different choices of the `_state` vector within the `LakeMonsterEnvironment` class. In particular, we try both polar and Cartesian coordinates to describe the position of the agent.
 
-To account for symmetries of the circle, after each time step, we rotate the entire lake (agent and monster included) so that the monster is mapped to the point (1, 0). This, hopefully, will reduce the complexity of the problem for the agent.
-
-In this particular implementation, our state is the 6-dimensional vector containing the following variables.
-
-- the ratio of the current step count to the maximum allowed step count
-- the monster's speed (constant throughout episode)
-- the x and y Cartesian-coordinates of the agent
-- the r and theta polar-coordinates of the agent
-
-While the Cartesian and polar coordinates give redundant information, the neural network underlying the agent's policy may benefit from it.
+To benefit from the symmetries of the circle, after each time step we rotate the entire lake (agent and monster included) so that the monster is mapped to the point (1, 0). We hope that this transformation reduces the complexity of the problem for the agent.
 
 ### Action
 
-Currently, the tf-agent implementation of a DQN agent requires the action of the agent to be both 1-dimensional and discrete. Consequently, the action of the environment is simply an angle corresponding to the direction in which the agent moves.
-
-bail on wrap!
-
-We wrap `LakeMonsterEnvironment` with the tf-agent class `ActionDiscretizeWrapper` to achieve the discretization. The number of possible directions can be passed as `num_actions` to the `Agent` class and has a strong effect on the complexity of the Q-network underlying the agent's policy.
+Currently, the TF-agent implementation of a DQN agent requires the action of the agent to be both 1-dimensional and discrete. The parameter `num_actions` specifies the number of possible directions that agent can step. We map each integer action to an angle uniformly distributed over the circle. The parameter `num_actions` is the dimension of the output of the policy network. Choosing a small value for `num_actions` (such as 4) will enable faster learning at the expense of less mobility for the agent.
 
 |             ![discrete actions](assets/actions.gif)              |
 | :--------------------------------------------------------------: |
@@ -92,11 +81,15 @@ We wrap `LakeMonsterEnvironment` with the tf-agent class `ActionDiscretizeWrappe
 
 ### Reward
 
-The agent receives a positive reward if it successfully escapes from the lake without being captured by the monster. The agent receives a negative reward if it is captured, or if the number of steps exceeds the maximum allowable steps within an episode.
+The agent receives a reward of +1 if it successfully escapes from the lake without being captured by the monster and receives no reward if it is captured. If the agent takes more steps than allowed within an episode, the agent receives a small negative reward. The purpose of discouraging timeouts is to incentivize the agent to attempt an escape rather than wander aimlessly.
 
-### Agent training and evaluation
+In some instances, we provide mini-rewards to our agent. Rather than give our agent a binary reward of 0 or 1, we give partial rewards for a near escape. If our the agent is captured by the monster, there must be a step within the episode at which the monster is at the agent's radial projection onto the circle. In other words, there must be a step at which the monster is situated on the shore waiting for the agent to arrive. An agent that escapes will never encounter a waiting monster, and so an agent who can make it closer to the shore before encountering a waiting monster is closer to escape. In this way, we can provide agents with larger rewards when they make it closer to the shore before finding a waiting monster. In a similar manner, we give agents additional rewards for succeeding by a wider margin. This can be quantified by considering the arc between the agent and the monster on the shore of the lack at the instant of escape.
 
-greedy vs exploration
+The lake-monster problem is an example of a sparse reward or delayed-reward environment. Agents only receive rewards at the termination of an episode; there is no reward at a transitional step within each episode. Some episodes may take dozens or even hundreds of steps to finish; consequently, learning in such an environment is difficult. Although it is possible to craft transitional rewards for an agent to steer it toward an optimal path, doing so defeats the goal of autonomous agent learning. We avoid human crafted step by step rewards.
+
+|                                                                                     ![rewards](assets/rewards.gif)                                                                                      |
+| :-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| _An agent receiving a partial reward for getting closer to the shore. The velocity vector in the upper left hand corner of the animation changes color once the monster becomes inline with the agent._ |
 
 ## Results
 
@@ -148,8 +141,6 @@ What cannot be tweaked?
   - num_actions
 
 The lake-monster problem exhibits a _monotonicity_ property which we can hope to leverage in training.
-
-### Tensorboard
 
 ## License
 

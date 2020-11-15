@@ -18,15 +18,15 @@ def launch_tb():
   webbrowser.open_new_tab(url)
 
 
-handmade_params = {'num_actions': 12,
+handmade_params = {'num_actions': 4,
                    'initial_step_size': 0.1,
-                   'initial_monster_speed': 3.50,
+                   'initial_monster_speed': 4.0,
                    'timeout_factor': 3,
                    'fc_layer_params': (50, 50),
                    'dropout_layer_params': None,
-                   'learning_rate': 0.0005,
+                   'learning_rate': 0.001,
                    'epsilon_greedy': 0.1,
-                   'n_step_update': 30,
+                   'n_step_update': 10,
                    'use_categorical': True,
                    'use_mini_rewards': True}
 

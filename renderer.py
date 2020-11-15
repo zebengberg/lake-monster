@@ -1,7 +1,7 @@
 """Utility functions for rendering an environment and displaying an episode in video."""
 
-import numpy as np
 import os
+import numpy as np
 from PIL import Image, ImageDraw
 import imageio
 # including this import for pipreqs
@@ -100,6 +100,25 @@ def renderer(monster_angle, prev_monster_angle, position, prev_action_vector,
     white = (255,) * 3
     draw.text((CENTER - 10, CENTER + 30), result.upper(), white)
     draw.text((CENTER - 10, CENTER + 50), f'REWARD: {reward:.3f}', white)
+
+  return im
+
+
+def render_many_agents(positions, step):
+  """Keep monster at (1, 0) and render agent positions."""
+  im = Image.new('RGB', (480, 480), (237, 201, 175))
+  draw = ImageDraw.Draw(im)
+  draw.ellipse((CENTER - RADIUS,) * 2 + (CENTER + RADIUS,) * 2,
+               fill=(0, 0, 255), outline=(0, 0, 0), width=4)
+  draw.ellipse((CENTER - 2,) * 2 + (CENTER + 2,) * 2, fill=(0, 0, 0))
+
+  step_text = f'STEP: {step}'
+  draw.text((CENTER - 20, SIZE - 20), step_text, (0, 0, 0))
+  draw.ellipse(angle_to_rect(0), fill=(40, 200, 40))
+
+  for p in positions:
+    color = (np.random.randint(256), np.random.randint(256), 0)
+    draw.ellipse(coords_to_rect(p), fill=color)
 
   return im
 

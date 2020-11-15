@@ -3,6 +3,7 @@
 
 import tensorflow as tf
 from agent import Agent
+from param_search import get_random_params
 
 
 class ModelWrapper(tf.Module):
@@ -19,7 +20,7 @@ class ModelWrapper(tf.Module):
     return self.net.layers[1](x)
 
 
-def log_graph(params=None):
+def log_graph(params=None, write_logs=True):
   """Call tf.summary.trace"""
   if params is None:
     params = {}
@@ -30,13 +31,16 @@ def log_graph(params=None):
   summary_writer.set_as_default()
 
   x = a.tf_eval_env.reset().observation  # input to model.__call__
-  tf.summary.trace_on()
-  model(x)
-  tf.summary.trace_export(name='q_net', step=0)
+  if write_logs:
+    tf.summary.trace_on()
+    model(x)
+    tf.summary.trace_export(name='q_net', step=0)
+  else:
+    model(x)
 
 
 def test_agent(params=None):
-  """Print summary and confirm parameters passed into self agree with tf objects."""
+  """Print network summary, confirm parameters, and run driver."""
   if params is None:
     params = {}
   a = Agent(**params)
@@ -59,8 +63,20 @@ def test_agent(params=None):
   assert n + 1 == a.num_actions
   assert a.py_eval_env.timeout_factor == a.timeout_factor
 
+  for _ in range(10):
+    a.driver.run()
+
 
 if __name__ == '__main__':
-  print('Testing agent ...')
+  print('Testing 10 distinct agents ...')
+  # testing with default parameters
   test_agent()
+  log_graph(write_logs=False)
+
+  # testing with random parameters
+  for _ in range(9):
+    p = get_random_params()
+    test_agent(p)
+    log_graph(p, False)
+
   print('All tests pass.')
