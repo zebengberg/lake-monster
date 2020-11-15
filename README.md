@@ -25,6 +25,8 @@ The lake-monster problem readily adapts to the RL framework. The _environment_ c
 
 ## Installation and Usage
 
+### Installation
+
 This simulation was created with Python 3.8 using TensorFlow and TF-Agents.
 
 You can clone or download this repository locally. You may want to create a new Python environment to install the dependencies using an environment manager such as `conda`.
@@ -35,11 +37,15 @@ conda activate monster
 pip install -r requirements.txt
 ```
 
+### Tests
+
 Test the lake-monster environment by running `python test_environment.py`. This script will initialize a random policy to interact with `LakeMonsterEnvironment` (see [Environment](#environment-and-agent)) and create a sample video showing an episode. Test the TensorFlow-derived DQN-based agent framework by running `python test_agent.py`. This script will instantiate several `Agent` objects, print out network statistics, and run a few episodes using the TF-agent `dynamic_episode_driver` pipeline.
 
 |                ![random policy](assets/random.gif)                |
 | :---------------------------------------------------------------: |
 | _An agent with a random policy interacting with the environment._ |
+
+### Usage
 
 After testing the basic components, you can train your very own agent to solve the lake-monster puzzle by running `python acquire_knowledge.py`. Default parameters are strong, and can be modified in the source code. See [Results](#results) for a discussion of parameter selection. As the agent learns, several pieces training knowledge are saved.
 
@@ -91,56 +97,68 @@ The lake-monster problem is an example of a sparse reward or delayed-reward envi
 | :-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
 | _An agent receiving a partial reward for getting closer to the shore. The velocity vector in the upper left hand corner of the animation changes color once the monster becomes inline with the agent._ |
 
-## Results
+## Learning
+
+### Parameters
+
+There are a number of parameters and hyperparameters involved in both the environment specification as well as the DQN agent. When initializing an `Agent` object, we specify the following variables.
+
+- `num_actions` -- the number of possible directions the agent can move within the environment
+- `initial_step_size` -- the length of each step made by the agent
+- `initial_monster_speed` -- the speed of the monster at the start of training
+- `timeout_factor` -- the episode terminates once the number of steps exceeds `timeout_factor / step_size`
+- `use_mini_rewards` -- see [Reward](#reward)
+- `use_cartesian` -- in addition to polar coordinates, use Cartesian coordinates in environment state
+- `use_noisy_start` -- rather than start at (0, 0), choose a random starting location for the agent
+- `fc_layer_params` -- parameters for the fully connected neural network underpinning the policy
+- `dropout_layer_params` -- used to create dropout layers in the neural network
+- `learning_rate` -- a parameter for the neural network Adam optimizer
+- `epsilon_greedy` -- a parameter to control the amount of exploration in DQN training
+- `n_step_update` -- the number of steps to look ahead when computing loss of Q-values
+- `use_categorical` -- see the TensorFlow [tutorial](https://www.tensorflow.org/agents/tutorials/9_c51_tutorial)
+- `use_step_schedule`, `use_learning_rate_schedule`, `use_mastery` -- see [Modifying Parameters](#modifying-parameters)
+
+As `num_actions` and `timeout_factor` grow large and `step_size` approaches 0, the discrete lake-monster environment approaches the idealized lake-monster continuous-motion environment. There is a natural trade-off as the discrete environment tends towards a continuous-motion environment. As `num_actions` grows, the output dimension of the neural network grows, thereby increasing the overall complexity of the network. As a result, the policy will take longer to train. Additionally, DQN exploration will grow linearly in `num_actions`. As `step_size` becomes small, the agent will make slower progress toward reaching the shoreline with untrained movements. Each episode will take longer to run, and the entire training process will slow. As `timeout_factor` increases, an agent may spend additional time wandering without progress thereby slowing learning. Conversely, as the environment tends toward one of continuous-motion, the agent is afforded more freedom in its movement which can allow it to perform better after extensive training.
+
+The lake-monster problem is provides a forgiving environment for the agent. If the agent makes mistakes in its actions, it has the ability to correct them by taking actions to bring the environment close to its initial state. In the optimal solution, an agent would never arrive at a position radially inline with the monster. In the gif below, this occurs when the velocity vector changes color. The agent retreats from this sub-optimal state before continuing on to eventually succeed.
+
+|             ![rewards](assets/path.gif)             |
+| :-------------------------------------------------: |
+| _A well-trained agent correcting initial missteps._ |
+
+### Modifying Parameters
+
+Some of the parameters discussed above cannot be tweaked without instantiated a new agent. In general, parameters required to initialize the neural network or replay buffer underpinning the agent cannot be changed. These include `num_actions`, `use_cartesian`, `n_step_update`, `use_cateorical`, and any of the layer parameters.
+
+On the other hand, some parameters can be modified without changing the basic structure of the learned objects. These include `monster_speed`, `step_size`, and `learning_rate`. The lake-monster problem exhibits a _monotonicity_ property which we can hope to leverage in training. If an agent can succeed against a monster with a high speed, by taking the same path, it can succeed against a monster with a lower speed. We expect this monotonicity to also hold with the `step_size` parameter: if an agent can escape from a monster when taking large steps, we also expect it to be able to escape from a monster by taking many smaller steps.
+
+When training an agent, we could use a _mastery-based_ approach. In such a setting, an agent initially encounters a slow monster. Once the agent has shown mastery in this easier environment, the speed of the monster is increased. In this way, the agent is always paired with a monster whose speed perfectly matches the ability of the agent.
+
+Extending this idea, the parameters `use_step_schedule`, `use_learning_rate_schedule`, and `use_mastery` modify parameters over the course of training. Often, this leads to better outcomes. See [Results](#results) for a discussion.
+
+Agent policies are periodically saved (see [Usage](#usage)) for later use. A well trained policy can be revived and evaluated with modified parameters. The agents who received extensive training often succeed when paired monsters with higher speeds simply by placing these agents into a more continuous environment.
+
+|                                                                                                         ![many agents](assets/many.gif)                                                                                                         |
+| :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| _A collection of agents in various states of training. Here, the monster is fixed in place and all agents are rotated toward the monster to account for its motion. Agents that stick to the wall above the monster have successfully escaped._ |
+
+### Nontrival Learning
+
+Suppose the agent runs antipodally away from the monster. The monster will traverse the lake circumference, aiming for the point at which the agent will intersect with the shoreline. (The monster could make its semi-circumnavigation in a clockwise or counterclockwise motion; both paths will lead to identical outcomes.) In such an episode, the agent will travel a total distance of 1 whereas the monster will travel a total distance of pi. Therefore, the agent will succeed with this strategy if and only the speed of the monster is less than pi.
+
+Because this strategy is so simple, we consider it as a baseline minimum for what the agent should aspire to learn. In other words, the agent has learned something nontrivial if it can escape from a monster who has a speed of at least pi. Due to the discretized nature of the environment (specifically, the discrete variables `step_size` and `num_actions`), the agent would not be able to enact this exact strategy. Nevertheless, we still consider a monster speed of pi as a baseline for an intelligent agent.
+
+With no knowledge of the mathematics, it is possible for a human to quickly experiment and do better. For example, the function `test_movement` in the [`test_environment` module](test_environment.py) uses simple handcrafted actions to succeed against a monster with speed 3.5. In the lake-monster problem, we expect most humans could eventually fine-tune a set of actions to succeed against a monster with speeds between pi and 4.0. We consider an agent to have _human-level_ intelligence if it can succeed against monsters with speeds up to 4.0. An agent who can escape from a monster with speeds above 4.0 is considered to have _super-human-level_ intelligence.
+
+Of course, we know that the [optimal mathematical solution](http://datagenetics.com/blog/october12013/index.html) allows an agent to escape a monster with speed 4.6. While speeds of this high are not possible in this discrete version of the problem, we expect to be able to get close to this upper bound.
 
 |           ![strong policy](assets/strong.gif)            |
 | :------------------------------------------------------: |
 | _An agent demonstrating highly complex learned actions._ |
 
-### Parameters
+## Results
 
-What does the network depend on? What does just the environment depend on??
-
-There are a number of hyperparameters involved in both the environment specification as well as the DQN agent's network. We describe significant parameters affecting agent performance here.
-
-- `num_actions` -- the number of possible directions the agent can move within the environment
-- `step_size` -- the length of each step made by the agent
-- `initial_monster_speed` -- the speed of the monster at the start of training
-- `timeout_factor` -- the episode terminates once the number of steps exceeds `timeout_factor / step_size`
-- `fc_layer_params` -- parameters for the fully connected neural network underlying the policy
-- `learning_rate` -- a parameter for the neural network optimizer
-- `epsilon_greedy` -- a parameter to allow for exploration in training
-
-As `num_actions` and `timeout_factor` grow large and `step_size` approaches 0, the dicrete environment approaches the idealized lake-monster continuous-motion environment. In addition, there are two competing phenomena at play as the discrete environment tends to this limit.
-
-- As `num_actions` grows, the output of the Q-learning neural network grows, thereby increasing the number of weights within the network. As a result, the policy will take longer to train. As `step_size` becomes small, the agent will make less progress toward reaching the shoreline with random untrained movements. As a result, it will take a long time for the agent to avoid timing out.
-- Conversely, the agent will be afforded more freedom in its movement.
-
-TODO: include more about timeout_factor
-
-### Nontrival Learning
-
-Suppose the agent runs antipodally away from the monster. In turn, the monster will traverse the lake circumference, aiming for the point at which the agent will intersect with the shoreline. (The monster could make his semi-circumnavigation in a clockwise or counterclockwise motion; both paths will take the same time.) In this episode, the agent will travel a total distance of 1 whereas the monster will travel a total distance of pi. Therefore, the agent will succeed with this strategy if and only the speed of the monster is less than pi.
-
-Because this strategy is so simple, we consider it as a baseline minimum for what the agent should aspire to learn. In other words, the agent has learned something nontrivial if it can escape from a monster who has a speed of at least pi. Due to the discretized nature of the environment (specifically, the discrete variables `step_size` and `num_actions`), the agent would not be able to enact this exact strategy. Nevertheless, we still consider a monster speed of pi as a baseline for an intelligent agent.
-
-### Training wheels, passoffs, learning targets
-
-What can be tweaked over time?
-
-- monster speed
-- step size
-- timeout factor
-- epsilon
-
-What cannot be tweaked?
-
-- NN stuff
-  - learning rate
-  - fc_layer_params
-  - num_actions
-
-The lake-monster problem exhibits a _monotonicity_ property which we can hope to leverage in training.
+In progress ....
 
 ## License
 

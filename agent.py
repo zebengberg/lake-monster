@@ -5,18 +5,17 @@ import os
 import warnings
 import absl.logging
 import tensorflow as tf
-from tf_agents.agents.dqn import dqn_agent
-from tf_agents.agents.categorical_dqn import categorical_dqn_agent
-from tf_agents.environments import tf_py_environment
+from tf_agents.agents.dqn.dqn_agent import DqnAgent
+from tf_agents.agents.categorical_dqn.categorical_dqn_agent import CategoricalDqnAgent
+from tf_agents.environments.tf_py_environment import TFPyEnvironment
 from tf_agents.networks import q_network, categorical_q_network
 from tf_agents.utils import common
-from tf_agents.replay_buffers import tf_uniform_replay_buffer
-from tf_agents.drivers import dynamic_episode_driver
-from tf_agents.policies import policy_saver
+from tf_agents.replay_buffers.tf_uniform_replay_buffer import TFUniformReplayBuffer
+from tf_agents.drivers.dynamic_episode_driver import DynamicEpisodeDriver
+from tf_agents.policies.policy_saver import PolicySaver
 from environment import LakeMonsterEnvironment
 from renderer import episode_as_video
-from param_search import log_results
-from read_logs import build_df, is_progress_made
+from utils import log_results, build_df_from_tf_logs
 
 
 # suppressing some annoying warnings
@@ -30,7 +29,7 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 EVAL_INTERVAL = 10
 SAVE_INTERVAL = 100
 VIDEO_INTERVAL = 1000
-POLICY_INTERVAL = 100
+POLICY_INTERVAL = 1000
 NUM_EVALS = SAVE_INTERVAL // EVAL_INTERVAL
 SUCCESS_SYMBOL = '$'
 FAIL_SYMBOL = '|'
@@ -50,33 +49,45 @@ def print_legend():
 
 class Agent:
   """A class to hold global variables for tf_agent training."""
-  # hyperparameters
   replay_buffer_max_length = 1_000_000
   batch_size = 64
 
   def __init__(
           self,
-          uid='unknown',
-          num_actions=4,
-          initial_step_size=0.3,
-          initial_monster_speed=1.0,
-          timeout_factor=3,
-          fc_layer_params=(100,),
+          uid,
+          num_actions=8,
+          initial_step_size=0.1,
+          initial_monster_speed=3.0,
+          timeout_factor=3.0,
+          use_mini_rewards=True,
+          use_cartesian=False,
+          use_noisy_start=False,
+          fc_layer_params=(20, 20),
           dropout_layer_params=None,
-          learning_rate=0.001,
+          learning_rate=0.0005,
           epsilon_greedy=0.1,
-          n_step_update=1,
+          n_step_update=10,
           use_categorical=False,
-          use_mini_rewards=False):
+          use_step_schedule=False,
+          use_learning_rate_schedule=False,
+          use_mastery=True):
 
     self.num_actions = num_actions
+    self.initial_step_size = initial_step_size
+    self.initial_monster_speed = initial_monster_speed
     self.timeout_factor = timeout_factor
+    self.use_mini_rewards = use_mini_rewards
+    self.use_cartesian = use_cartesian
+    self.use_noisy_start = use_noisy_start
     self.fc_layer_params = fc_layer_params
     self.dropout_layer_params = dropout_layer_params
     self.learning_rate = learning_rate
     self.epsilon_greedy = epsilon_greedy
     self.n_step_update = n_step_update
-    self.use_mini_rewards = use_mini_rewards
+    self.use_categorical = use_categorical
+    self.use_step_schedule = use_step_schedule
+    self.use_learning_rate_schedule = use_learning_rate_schedule
+    self.use_mastery = use_mastery
 
     # variable for determining learning target mastery
     self.learning_score = 0
@@ -90,7 +101,8 @@ class Agent:
     self.uid = tf.Variable(uid, dtype=tf.string)
     self.monster_speed = tf.Variable(initial_monster_speed, dtype=tf.float64)
     self.step_size = tf.Variable(initial_step_size, dtype=tf.float64)
-    if use_categorical:
+    if self.use_categorical:
+      self.dropout_layer_params = None  # overwriting
       self.q_net, self.agent = self.build_categorical_dqn_agent()
     else:
       self.q_net, self.agent = self.build_dqn_agent()
@@ -111,7 +123,7 @@ class Agent:
   def build_dqn_agent(self):
     """Build DQN agent with QNetwork."""
     py_temp_env = LakeMonsterEnvironment(num_actions=self.num_actions)
-    tf_temp_env = tf_py_environment.TFPyEnvironment(py_temp_env)
+    tf_temp_env = TFPyEnvironment(py_temp_env)
 
     q_net = q_network.QNetwork(
         tf_temp_env.observation_spec(),
@@ -120,7 +132,7 @@ class Agent:
         dropout_layer_params=self.dropout_layer_params)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
-    agent = dqn_agent.DqnAgent(
+    agent = DqnAgent(
         tf_temp_env.time_step_spec(),
         tf_temp_env.action_spec(),
         n_step_update=self.n_step_update,
@@ -129,14 +141,13 @@ class Agent:
         epsilon_greedy=self.epsilon_greedy,
         td_errors_loss_fn=common.element_wise_squared_loss,
         train_step_counter=tf.Variable(0, dtype=tf.int64))
-    agent.train = common.function(agent.train)
 
     return q_net, agent
 
   def build_categorical_dqn_agent(self):
     """Build categorical DQN agent with CategoricalQNetwork."""
     py_temp_env = LakeMonsterEnvironment(num_actions=self.num_actions)
-    tf_temp_env = tf_py_environment.TFPyEnvironment(py_temp_env)
+    tf_temp_env = TFPyEnvironment(py_temp_env)
 
     if self.dropout_layer_params is not None:
       raise AttributeError('CategoricalQNetwork does accept dropout layers.')
@@ -147,7 +158,7 @@ class Agent:
         fc_layer_params=self.fc_layer_params)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
-    agent = categorical_dqn_agent.CategoricalDqnAgent(
+    agent = CategoricalDqnAgent(
         tf_temp_env.time_step_spec(),
         tf_temp_env.action_spec(),
         n_step_update=self.n_step_update,
@@ -164,7 +175,7 @@ class Agent:
 
   def build_replay_buffer(self):
     """Build replay buffer."""
-    return tf_uniform_replay_buffer.TFUniformReplayBuffer(
+    return TFUniformReplayBuffer(
         data_spec=self.agent.collect_data_spec,
         batch_size=1,
         max_length=self.replay_buffer_max_length)
@@ -189,24 +200,25 @@ class Agent:
               'timeout_factor': self.timeout_factor,
               'step_size': self.step_size.numpy().item(),
               'num_actions': self.num_actions,
-              'use_mini_rewards': self.use_mini_rewards}
+              'use_mini_rewards': self.use_mini_rewards,
+              'use_cartesian': self.use_cartesian,
+              'use_noisy_start': self.use_noisy_start}
     py_train_env = LakeMonsterEnvironment(**params)
-    tf_train_env = tf_py_environment.TFPyEnvironment(py_train_env)
+    tf_train_env = TFPyEnvironment(py_train_env)
+
+    params['use_noisy_start'] = False  # don't want noisy start for evaluation
     py_eval_env = LakeMonsterEnvironment(**params)
-    tf_eval_env = tf_py_environment.TFPyEnvironment(py_eval_env)
+    tf_eval_env = TFPyEnvironment(py_eval_env)
+
     return tf_train_env, py_eval_env, tf_eval_env
 
   def build_driver(self):
     """Build elements of the data pipeline."""
     observers = [self.replay_buffer.add_batch]
-    driver = dynamic_episode_driver.DynamicEpisodeDriver(
+    driver = DynamicEpisodeDriver(
         env=self.tf_train_env,
         policy=self.agent.collect_policy,
         observers=observers)
-
-    # giving replay buffer some initial data
-    for _ in range(3):
-      driver.run()
 
     dataset = self.replay_buffer.as_dataset(
         num_parallel_calls=3,
@@ -270,10 +282,10 @@ class Agent:
                 'step_size': self.step_size,  # already tf.Variable
                 'timeout_factor': tf.Variable(self.timeout_factor),
                 'num_actions': tf.Variable(self.num_actions)}
-    saver = policy_saver.PolicySaver(self.agent.policy,
-                                     train_step=self.agent.train_step_counter,
-                                     metadata=metadata,
-                                     batch_size=None)
+    saver = PolicySaver(self.agent.policy,
+                        train_step=self.agent.train_step_counter,
+                        metadata=metadata,
+                        batch_size=None)
     dir_name = f'{self.uid.numpy().decode()}-{step}'
     filepath = os.path.join('policies', dir_name)
     saver.save(filepath)
@@ -307,19 +319,13 @@ class Agent:
         self.monster_speed.assign_add(0.04)
       self.reset()
 
-    if step == 82_000:
+    if step == 100_000:
       self.step_size.assign(0.05)
       self.reset()
 
     elif step == 200_000:
       self.step_size.assign(0.02)
       self.reset()
-
-    # elif not is_progress_made():  # if no progress, reduce step size
-    #   print('No progress has recently been made!')
-    #   print("The agent's step size is decreasing.")
-    #   self.step_size.assign(tf.multiply(self.step_size, 0.5))
-    #   self.reset()
 
   def run_eval(self, step):
     """Evaluate agent and print out key statistics."""
@@ -335,24 +341,33 @@ class Agent:
     else:
       print(FAIL_SYMBOL, end='', flush=True)
 
+  def run_video(self, step):
+    """Save a video and log results."""
+    episode_as_video(self.py_eval_env, self.agent.policy,
+                     f'episode-{step}', self.tf_eval_env)
+    df = build_df_from_tf_logs()
+    log_results(self.uid.numpy().decode(), df.to_dict(orient='list'))
+
   def train_ad_infinitum(self):
     """Train the agent until interrupted by user."""
+    # some basic setup needed
+    self.agent.train = common.function(self.agent.train)
+    self.driver.run()
+    self.driver.run()
+    self.driver.run()
 
     print_legend()
     while True:
       train_step = self.agent.train_step_counter.numpy().item()
-      self.driver.run()
-      experience, _ = next(self.iterator)
-      self.agent.train(experience)
-
+      if train_step % POLICY_INTERVAL == 0:
+        self.save_policy(train_step)
+      if train_step % VIDEO_INTERVAL == 0:
+        self.run_video(train_step)
       if train_step % SAVE_INTERVAL == 0:
         self.run_save(train_step)
       if train_step % EVAL_INTERVAL == 0:
         self.run_eval(train_step)
-      if train_step % VIDEO_INTERVAL == 0:
-        episode_as_video(self.py_eval_env, self.agent.policy,
-                         f'episode-{train_step}', self.tf_eval_env)
-        log_results(self.uid.numpy().decode(),
-                    build_df().to_dict(orient='list'))
-      if train_step % POLICY_INTERVAL == 0:
-        self.save_policy(train_step)
+
+      self.driver.run()
+      experience, _ = next(self.iterator)
+      self.agent.train(experience)

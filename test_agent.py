@@ -3,7 +3,7 @@
 
 import tensorflow as tf
 from agent import Agent
-from param_search import get_random_params
+from utils import get_random_params
 
 
 class ModelWrapper(tf.Module):

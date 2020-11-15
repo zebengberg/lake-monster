@@ -12,7 +12,7 @@ import pygifsicle
 from tf_agents.environments import tf_py_environment
 from tf_agents.policies import random_py_policy, scripted_py_policy
 from environment import LakeMonsterEnvironment
-from renderer import episode_as_gif, render_many_agents
+from renderer import episode_as_gif, render_many_agents, render_agent_path
 
 
 # suppressing some annoying warnings
@@ -77,35 +77,77 @@ def create_policy_gif(policy_path=None, asset_path=None, new_params=None):
   episode_as_gif(py_env, policy, asset_path, tf_env=tf_env, fps=10)
 
 
+def create_gif_with_path():
+  """Create a gif showing the agent's path over an episode."""
+  policy_path = 'policies/87497411048514251456633633962304499656-136600'
+  policy = tf.saved_model.load(policy_path)
+  env_params = policy.get_metadata()
+  for k, v in env_params.items():
+    # casting from tf.Variable to python native
+    env_params[k] = v.numpy().item()
+  # overwriting parameters
+  env_params['step_size'] = 0.01
+  env_params['monster_speed'] = 4.1
+  py_env = LakeMonsterEnvironment(**env_params)
+  tf_env = tf_py_environment.TFPyEnvironment(py_env)
+
+  time_step = tf_env.reset()
+  path = []
+  filepath = 'assets/path.gif'
+  with imageio.get_writer(filepath, mode='I', fps=10) as gif:
+    while not time_step.is_last():
+      action = policy.action(time_step)
+      time_step = tf_env.step(action.action)
+      im, real_position = py_env.render('return_real')
+      path.append(real_position)
+      im = render_agent_path(im, path)
+      gif.append_data(np.array(im))
+    for _ in range(30):
+      gif.append_data(np.array(im))
+  pygifsicle.optimize(filepath)
+
+
 def create_many_policy_gif():
-  num_steps = 30
-  uid = '39935599452309912566674413676269170632'
+  """Create a gif superimposing the actions of many policies."""
+  num_steps = 300  # == timeout_factor / step_size
+  step_size = 0.01
+  monster_speed = 4.0
+  fps = 10
+
+  uid = '87497411048514251456633633962304499656'
   policy_paths = glob.glob('policies/' + uid + '*')
 
   all_positions = []
+  colors = []
   for policy_path in tqdm(policy_paths):
+    color = (np.random.randint(256), np.random.randint(128), 0)
     policy = tf.saved_model.load(policy_path)
     env_params = policy.get_metadata()
     for k, v in env_params.items():
       # casting from tf.Variable to python native
       env_params[k] = v.numpy().item()
+    # overwriting parameters
+    env_params['step_size'] = step_size
+    env_params['monster_speed'] = monster_speed
     py_env = LakeMonsterEnvironment(**env_params)
     tf_env = tf_py_environment.TFPyEnvironment(py_env)
 
     time_step = tf_env.reset()
     agent_positions = {}
     for step in range(num_steps):
-      action = policy.action(time_step)
-      time_step = tf_env.step(action.action)
+      if not time_step.is_last():
+        action = policy.action(time_step)
+        time_step = tf_env.step(action.action)
       agent_positions[step] = py_env.position
     all_positions.append(agent_positions)
+    colors.append(color)
 
-  # transposing positions
   filepath = 'assets/many.gif'
-  with imageio.get_writer(filepath, mode='I', fps=10) as gif:
+  with imageio.get_writer(filepath, mode='I', fps=fps) as gif:
     for step in range(num_steps):
       positions = [item[step] for item in all_positions]
-      im = render_many_agents(positions, step)
+      im = render_many_agents(positions, colors, step,
+                              step_size, 4, monster_speed)
       gif.append_data(np.array(im))
   pygifsicle.optimize(filepath)
 
@@ -125,4 +167,5 @@ if __name__ == '__main__':
   # a_path = 'assets/strong.gif'
   # params = {'step_size': 0.01, 'monster_speed': 4.2}
   # create_policy_gif(p_path, a_path, params)
-  create_many_policy_gif()
+  # create_many_policy_gif()
+  create_gif_with_path()

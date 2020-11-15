@@ -15,11 +15,3 @@ if os.path.exists('logs/'):
 
 if os.path.exists('agent_id.txt'):
   os.remove('agent_id.txt')
-
-
-# uncomment lines below to clean out everything
-
-# if os.path.exists('policies/'):
-#   shutil.rmtree('policies/')
-# if os.path.exists('results.json'):
-#   os.remove('results.json')

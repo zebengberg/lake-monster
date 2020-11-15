@@ -12,6 +12,7 @@ import pygifsicle
 SIZE = 480
 CENTER = SIZE // 2
 RADIUS = 200
+RED = (250, 50, 0)
 
 
 def coords_to_rect(coords):
@@ -52,8 +53,34 @@ def arrow_segments(vector):
   return lines
 
 
-def renderer(monster_angle, prev_monster_angle, position, prev_action_vector,
-             result, reward, step, monster_speed, num_actions, step_size, is_caught):
+def draw_text(draw, monster_speed, step, step_size, num_actions, position=None):
+  """Draw informational text to image."""
+  monster_text = f'MONSTER SPEED: {monster_speed}'
+  step_text = f'STEP: {step}'
+
+  actions_text = f'NUMBER OF ACTIONS: {num_actions}'
+  size_text = f'STEP SIZE: {step_size}'
+  draw.text((10, SIZE - 20), monster_text, (0, 0, 0))
+  draw.text((10, SIZE - 40), actions_text, (0, 0, 0))
+  draw.text((10, SIZE - 60), size_text, (0, 0, 0))
+  draw.text((CENTER - 20, SIZE - 20), step_text, (0, 0, 0))
+  if position is not None:
+    radius_text = f'RADIUS: {np.linalg.norm(position):.3f}'
+    draw.text((CENTER + 80, SIZE - 20), radius_text, (0, 0, 0))
+
+
+def renderer(monster_angle,
+             prev_monster_angle,
+             position,
+             prev_action_vector,
+             result,
+             reward,
+             step,
+             monster_speed,
+             num_actions,
+             step_size,
+             is_caught,
+             return_real=False):
   """Render an environment state as a PIL image."""
 
   c, s = np.cos(monster_angle), np.sin(monster_angle)
@@ -66,20 +93,10 @@ def renderer(monster_angle, prev_monster_angle, position, prev_action_vector,
   draw.ellipse((CENTER - RADIUS,) * 2 + (CENTER + RADIUS,) * 2,
                fill=(0, 0, 255), outline=(0, 0, 0), width=4)
   draw.ellipse((CENTER - 2,) * 2 + (CENTER + 2,) * 2, fill=(0, 0, 0))
+  draw_text(draw, monster_speed, step, step_size, num_actions, position)
 
-  draw.ellipse(coords_to_rect(real_position), fill=(250, 50, 0))
+  draw.ellipse(coords_to_rect(real_position), fill=RED)
   draw.ellipse(angle_to_rect(monster_angle), fill=(40, 200, 40))
-
-  monster_text = f'MONSTER SPEED: {monster_speed}'
-  step_text = f'STEP: {step}'
-  radius_text = f'RADIUS: {np.linalg.norm(position):.3f}'
-  actions_text = f'NUMBER OF ACTIONS: {num_actions}'
-  size_text = f'STEP SIZE: {step_size}'
-  draw.text((10, SIZE - 20), monster_text, (0, 0, 0))
-  draw.text((10, SIZE - 40), actions_text, (0, 0, 0))
-  draw.text((10, SIZE - 60), size_text, (0, 0, 0))
-  draw.text((CENTER - 20, SIZE - 20), step_text, (0, 0, 0))
-  draw.text((CENTER + 80, SIZE - 20), radius_text, (0, 0, 0))
 
   # drawing the arrow
   if prev_action_vector is not None:
@@ -101,25 +118,33 @@ def renderer(monster_angle, prev_monster_angle, position, prev_action_vector,
     draw.text((CENTER - 10, CENTER + 30), result.upper(), white)
     draw.text((CENTER - 10, CENTER + 50), f'REWARD: {reward:.3f}', white)
 
+  if return_real:
+    return im, real_position
   return im
 
 
-def render_many_agents(positions, step):
+def render_agent_path(im, path):
+  """Draw path onto im."""
+  np_center = np.array((CENTER, CENTER))
+  np_radius = np.array((RADIUS, -RADIUS))
+  scaled_path = [tuple(np_center + np_radius * coord) for coord in path]
+  draw = ImageDraw.Draw(im)
+  draw.line(scaled_path, fill=RED, width=4)
+  return im
+
+
+def render_many_agents(positions, colors, step, step_size, num_actions, monster_speed):
   """Keep monster at (1, 0) and render agent positions."""
   im = Image.new('RGB', (480, 480), (237, 201, 175))
   draw = ImageDraw.Draw(im)
   draw.ellipse((CENTER - RADIUS,) * 2 + (CENTER + RADIUS,) * 2,
                fill=(0, 0, 255), outline=(0, 0, 0), width=4)
   draw.ellipse((CENTER - 2,) * 2 + (CENTER + 2,) * 2, fill=(0, 0, 0))
+  draw_text(draw, monster_speed, step, step_size, num_actions)
+  draw.ellipse(angle_to_rect(0), fill=(40, 200, 40))  # monster themself
 
-  step_text = f'STEP: {step}'
-  draw.text((CENTER - 20, SIZE - 20), step_text, (0, 0, 0))
-  draw.ellipse(angle_to_rect(0), fill=(40, 200, 40))
-
-  for p in positions:
-    color = (np.random.randint(256), np.random.randint(256), 0)
-    draw.ellipse(coords_to_rect(p), fill=color)
-
+  for p, c in zip(positions, colors):
+    draw.ellipse(coords_to_rect(p), fill=c)
   return im
 
 
