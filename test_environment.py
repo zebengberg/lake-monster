@@ -120,14 +120,14 @@ def test_movement():
 
 
 if __name__ == '__main__':
-  print('\n' + '#' * 80)
+  print('\n' + '#' * 65)
   validate_environment()
-  print('\n' + '#' * 80)
+  print('\n' + '#' * 65)
   test_py_environment_with_random()
-  print('\n' + '#' * 80)
+  print('\n' + '#' * 65)
   test_tf_environment_with_random()
-  print('\n' + '#' * 80)
+  print('\n' + '#' * 65)
   test_video()
   test_movement()
-  print('\n' + '#' * 80)
+  print('\n' + '#' * 65)
   print('All tests pass.')

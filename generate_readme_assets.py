@@ -46,55 +46,43 @@ def create_action_gif():
                  filepath='assets/actions.gif', fps=1)
 
 
-def create_policy_gif(policy_path=None, asset_path=None, new_params=None):
+def create_policy_gif(policy_path, asset_path, new_params=None):
   """Create a gif showing a saved policy in action."""
-
-  if policy_path is None:  # choosing any available policy
-    policies = os.listdir('policies')
-    if policies:
-      policy_path = os.path.join('policies', policies[0])
-    else:
-      raise FileNotFoundError('No policies to show.')
 
   policy = tf.saved_model.load(policy_path)
   env_params = policy.get_metadata()
   for k, v in env_params.items():
     # casting from tf.Variable to python native
     env_params[k] = v.numpy().item()
-
   # overwriting some parameters
   if new_params:
     for k, v in new_params.items():
       env_params[k] = v
 
-  print('Creating a gif with environment parameters:')
-  print(env_params)
-
   py_env = LakeMonsterEnvironment(**env_params)
   tf_env = tf_py_environment.TFPyEnvironment(py_env)
-  if asset_path is None:
-    asset_path = 'assets/policy.gif'
   episode_as_gif(py_env, policy, asset_path, tf_env=tf_env, fps=10)
 
 
-def create_gif_with_path():
+def create_policy_gif_with_path(policy_path, asset_path, new_params=None):
   """Create a gif showing the agent's path over an episode."""
-  policy_path = 'policies/87497411048514251456633633962304499656-136600'
+
   policy = tf.saved_model.load(policy_path)
   env_params = policy.get_metadata()
   for k, v in env_params.items():
     # casting from tf.Variable to python native
     env_params[k] = v.numpy().item()
   # overwriting parameters
-  env_params['step_size'] = 0.01
-  env_params['monster_speed'] = 4.1
+  if new_params:
+    for k, v in new_params.items():
+      env_params[k] = v
+
   py_env = LakeMonsterEnvironment(**env_params)
   tf_env = tf_py_environment.TFPyEnvironment(py_env)
 
   time_step = tf_env.reset()
   path = []
-  filepath = 'assets/path.gif'
-  with imageio.get_writer(filepath, mode='I', fps=10) as gif:
+  with imageio.get_writer(asset_path, mode='I', fps=10) as gif:
     while not time_step.is_last():
       action = policy.action(time_step)
       time_step = tf_env.step(action.action)
@@ -104,7 +92,7 @@ def create_gif_with_path():
       gif.append_data(np.array(im))
     for _ in range(30):
       gif.append_data(np.array(im))
-  pygifsicle.optimize(filepath)
+  pygifsicle.optimize(asset_path)
 
 
 def create_many_policy_gif():
@@ -114,7 +102,7 @@ def create_many_policy_gif():
   monster_speed = 4.0
   fps = 10
 
-  uid = '87497411048514251456633633962304499656'
+  uid = '65601302196810597370436998403635834824'
   policy_paths = glob.glob('policies/' + uid + '*')
 
   all_positions = []
@@ -155,17 +143,26 @@ def create_many_policy_gif():
 if __name__ == '__main__':
   if not os.path.exists('assets/'):
     os.mkdir('assets')
-  # create_random_gif()
-  # create_action_gif()
+  create_random_gif()
+  create_action_gif()
+  create_many_policy_gif()
 
-  # p_path = 'policies/87497411048514251456633633962304499656-83200'
-  # a_path = 'assets/capture.gif'
-  # params = {'step_size': 0.02, 'monster_speed': 3.75}
-  # create_policy_gif(p_path, a_path, params)
+  p_path = 'policies/65601302196810597370436998403635834824-12000'
+  a_path = 'assets/reward.gif'
+  params = {'step_size': 0.02, 'monster_speed': 3.7, 'use_mini_rewards': True}
+  create_policy_gif_with_path(p_path, a_path, params)
 
-  # p_path = 'policies/87497411048514251456633633962304499656-172100'
-  # a_path = 'assets/strong.gif'
-  # params = {'step_size': 0.01, 'monster_speed': 4.2}
-  # create_policy_gif(p_path, a_path, params)
-  # create_many_policy_gif()
-  create_gif_with_path()
+  p_path = 'policies/87497411048514251456633633962304499656-83200'
+  a_path = 'assets/capture.gif'
+  params = {'step_size': 0.02, 'monster_speed': 3.75}
+  create_policy_gif_with_path(p_path, a_path, params)
+
+  p_path = 'policies/87497411048514251456633633962304499656-172100'
+  a_path = 'assets/strong.gif'
+  params = {'step_size': 0.01, 'monster_speed': 4.2}
+  create_policy_gif_with_path(p_path, a_path, params)
+
+  p_path = 'policies/87497411048514251456633633962304499656-136600'
+  a_path = 'assets/path.gif'
+  params = {'step_size': 0.01, 'monster_speed': 4.1}
+  create_policy_gif_with_path(p_path, a_path, params)
