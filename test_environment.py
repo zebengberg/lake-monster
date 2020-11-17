@@ -9,7 +9,7 @@ from tf_agents.environments.tf_py_environment import TFPyEnvironment
 from tf_agents.policies.random_py_policy import RandomPyPolicy
 from tf_agents.policies.random_tf_policy import RandomTFPolicy
 from environment import LakeMonsterEnvironment
-from renderer import episode_as_video
+from animate import episode_as_video
 
 
 TEST_VIDEO_FILENAME = 'test'
@@ -97,7 +97,7 @@ def test_video():
   """Run an episode and save video to file."""
   env = LakeMonsterEnvironment(**params)
   policy = RandomPyPolicy(time_step_spec=None, action_spec=env.action_spec())
-  episode_as_video(py_env=env, policy=policy, filename=TEST_VIDEO_FILENAME)
+  episode_as_video(policy, params, filename=TEST_VIDEO_FILENAME)
 
 
 def test_movement():

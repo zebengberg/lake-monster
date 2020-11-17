@@ -24,7 +24,11 @@ def build_new_agent(use_random=False):
   uid = str(uuid.uuid1().int)
   if use_random:
     params = get_random_params()
-  else:
+    print('Initializing new agent with parametes:')
+    print(params)
+    print('')
+  else:  # using default agent parameters
+    print('Initializing new agent with default parameters.\n')
     params = {}
 
   test_agent(uid, params)
@@ -36,9 +40,11 @@ def build_new_agent(use_random=False):
 
 def restore_existing_agent():
   """Build new agent from scratch."""
-  if not os.path.exists('agent_id.txt'):
-    raise FileNotFoundError('Cannot find agent_id.txt')
+  print('Loading existing agent from file.\n')
   uid, params = read_params()
+  print('Restored agent has parameters:')
+  print(params)
+  print('')
   test_agent(uid, params)
   return Agent(uid, **params)
 

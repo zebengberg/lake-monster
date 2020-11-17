@@ -10,10 +10,10 @@ import pandas as pd
 # sorted from least complexity to most complexity
 param_universe = {
     # environment params
-    'num_actions': [4, 8, 12, 16],
-    'initial_step_size': [0.4, 0.3, 0.2, 0.1],
-    'initial_monster_speed': [2.0, 2.5, 3.0, 3.5, 4.0],
-    'timeout_factor': [2.0, 3.0, 5.0],
+    'num_actions': [4, 8, 16, 32],
+    'initial_step_size': [0.4, 0.2, 0.1, 0.05],
+    'initial_monster_speed': [2.5, 3.0, 3.5, 4.0],
+    'timeout_factor': [1.5, 2.0, 2.5, 3.0],
     'use_mini_rewards': [False, True],
     'use_cartesian': [False, True],
     'use_noisy_start': [False, True],
@@ -26,7 +26,6 @@ param_universe = {
     'n_step_update': [1, 5, 10],
     'use_categorical': [False, True],
     'use_step_schedule': [False, True],
-    'use_learning_rate_schedule': [False, True],
     'use_mastery': [False, True],
 }
 
@@ -62,10 +61,10 @@ def log_params(uid, params):
     data = {}
 
   assert uid not in data
-  data[uid] = {'params': params, 'results': {}}
+  data[uid] = {'params': params, 'results': []}
 
   with open('results.json', 'w') as f:
-    json.dump(data, f)
+    json.dump(data, f, indent=2)
 
   # remove backup copy
   if os.path.exists('backup.json'):
@@ -82,7 +81,7 @@ def log_results(uid, results):
 
   assert uid in data
   # possibly overwriting an existing entry
-  data[uid]['results'] = results
+  data[uid]['results'].append(results)
 
   with open('results.json', 'w') as f:
     json.dump(data, f, indent=2)
@@ -93,6 +92,24 @@ def log_results(uid, results):
 def merge_results_and_policies(new_results_path, new_policies_path):
   pass
 # TODO: write this
+
+
+def tf_to_py(d):
+  """Convert a dict of tf.Variables to Python native types."""
+  if not isinstance(d, dict):
+    raise NotImplementedError('Only implemented for dictionaries.')
+  for k, v in d.items():
+    d[k] = v.numpy().item()
+  return d
+
+
+def py_to_tf(d):
+  """Convert a dict of python variables to tf.Variables."""
+  if not isinstance(d, dict):
+    raise NotImplementedError('Only implemented for dictionaries.')
+  for k, v in d.items():
+    d[k] = tf.Variable(v)
+  return d
 
 
 def build_df_from_tf_logs():

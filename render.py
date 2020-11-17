@@ -1,12 +1,8 @@
 """Utility functions for rendering an environment and displaying an episode in video."""
 
-import os
+
 import numpy as np
 from PIL import Image, ImageDraw
-import imageio
-# including this import for pipreqs
-import imageio_ffmpeg  # pylint: disable=unused-import
-import pygifsicle
 
 
 SIZE = 480
@@ -55,11 +51,11 @@ def arrow_segments(vector):
 
 def draw_text(draw, monster_speed, step, step_size, num_actions, position=None):
   """Draw informational text to image."""
-  monster_text = f'MONSTER SPEED: {monster_speed}'
+  monster_text = f'MONSTER SPEED: {monster_speed:.3f}'
   step_text = f'STEP: {step}'
-
   actions_text = f'NUMBER OF ACTIONS: {num_actions}'
-  size_text = f'STEP SIZE: {step_size}'
+  size_text = f'STEP SIZE: {step_size:.3f}'
+
   draw.text((10, SIZE - 20), monster_text, (0, 0, 0))
   draw.text((10, SIZE - 40), actions_text, (0, 0, 0))
   draw.text((10, SIZE - 60), size_text, (0, 0, 0))
@@ -146,51 +142,3 @@ def render_many_agents(positions, colors, step, step_size, num_actions, monster_
   for p, c in zip(positions, colors):
     draw.ellipse(coords_to_rect(p), fill=c)
   return im
-
-
-def episode_as_video(py_env, policy, filename, tf_env=None):
-  """Create mp4 video through py_environment render method."""
-  print('Creating video with render method ...')
-
-  if tf_env is None:
-    tf_env = py_env
-
-  fps = 10
-  with imageio.get_writer('tmp.mp4', fps=fps) as video:
-    time_step = tf_env.reset()
-    video.append_data(py_env.render())
-    while not time_step.is_last():
-      action = policy.action(time_step).action
-      time_step = tf_env.step(action)
-      video.append_data(py_env.render())
-    for _ in range(3 * fps):  # play for 3 more seconds
-      video.append_data(py_env.render())
-
-  # giving video file a more descriptive name
-  _, result = py_env.determine_reward()
-  if not os.path.exists('videos/'):
-    os.mkdir('videos/')
-  filename = os.path.join('videos/', filename + '-' + result + '.mp4')
-  os.rename('tmp.mp4', filename)
-  print(f'Video created and saved as {filename}')
-
-
-def episode_as_gif(py_env, policy, filepath, fps=30, tf_env=None):
-  """Create gif through py_environment render method."""
-
-  if tf_env is None:
-    tf_env = py_env
-
-  with imageio.get_writer(filepath, mode='I', fps=fps) as gif:
-    time_step = tf_env.reset()
-    # using the policy_state to deal with scripted_policy possibility
-    policy_state = policy.get_initial_state(batch_size=1)
-    gif.append_data(py_env.render())
-    while not time_step.is_last():
-      action = policy.action(time_step, policy_state)
-      time_step = tf_env.step(action.action)
-      policy_state = action.state
-      gif.append_data(py_env.render())
-    for _ in range(fps):  # play for 1 more seconds
-      gif.append_data(py_env.render())
-  pygifsicle.optimize(filepath)

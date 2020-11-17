@@ -1,6 +1,6 @@
 """A module for testing the Agent class and logging tf graph information."""
 
-
+import os
 import tensorflow as tf
 from agent import Agent
 from utils import get_random_params
@@ -37,7 +37,7 @@ def log_graph(uid, params=None, write_logs=True):
 
   model = ModelWrapper(a.q_net.copy(), a.use_categorical)
 
-  x = a.tf_eval_env.reset().observation  # input to model.__call__
+  x = a.tf_env.reset().observation  # input to model.__call__
   if write_logs:
     summary_writer = tf.summary.create_file_writer('logs/')
     summary_writer.set_as_default()
@@ -72,20 +72,23 @@ def test_agent(uid, params=None):
   assert a.agent.train_sequence_length == a.n_step_update + 1
 
   # environment parameters
-  n = a.tf_train_env.action_spec().maximum - a.tf_train_env.action_spec().minimum
+  n = a.tf_env.action_spec().maximum - a.tf_env.action_spec().minimum
   assert a.num_actions == n + 1
-  assert a.monster_speed.numpy().item() == a.py_eval_env.monster_speed
-  assert a.timeout_factor == a.py_eval_env.timeout_factor
-  assert a.num_actions == a.py_eval_env.num_actions
-  assert a.step_size.numpy().item() == a.py_eval_env.step_size
-  assert a.use_mini_rewards == a.py_eval_env.use_mini_rewards
-  assert a.use_cartesian == a.py_eval_env.use_cartesian
+  assert a.monster_speed.numpy().item() == a.py_env.monster_speed
+  assert a.timeout_factor == a.py_env.timeout_factor
+  assert a.num_actions == a.py_env.num_actions
+  assert a.step_size.numpy().item() == a.py_env.step_size
+  assert a.use_mini_rewards == a.py_env.use_mini_rewards
+  assert a.use_cartesian == a.py_env.use_cartesian
 
   for _ in range(10):
     a.driver.run()
 
 
 if __name__ == '__main__':
+  if os.path.exists('agent_id.txt'):
+    raise NotImplementedError(
+        'Can only test when no partially trained agent exists. Run `clean_knowledge.py`.')
   print('Testing an agent with default parameters')
   name = 'test_agent'
   test_agent(name)

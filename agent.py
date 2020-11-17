@@ -14,8 +14,9 @@ from tf_agents.replay_buffers.tf_uniform_replay_buffer import TFUniformReplayBuf
 from tf_agents.drivers.dynamic_episode_driver import DynamicEpisodeDriver
 from tf_agents.policies.policy_saver import PolicySaver
 from environment import LakeMonsterEnvironment
-from renderer import episode_as_video
-from utils import log_results, build_df_from_tf_logs
+from animate import episode_as_video
+from evaluate import evaluate_episode, probe_policy
+from utils import log_results, py_to_tf
 
 
 # suppressing some annoying warnings
@@ -25,12 +26,10 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
-# a few constant global variables
-EVAL_INTERVAL = 10
-SAVE_INTERVAL = 100
-VIDEO_INTERVAL = 1000
-POLICY_INTERVAL = 1000
-NUM_EVALS = SAVE_INTERVAL // EVAL_INTERVAL
+FORMATIVE_INTERVAL = 20
+SAVE_INTERVAL = 200
+SUMMATIVE_INTERVAL = 2000
+NUM_EVALS = SAVE_INTERVAL // FORMATIVE_INTERVAL
 SUCCESS_SYMBOL = '$'
 FAIL_SYMBOL = '|'
 
@@ -39,11 +38,17 @@ def print_legend():
   """Print command line training legend."""
   print('\n' + '#' * 65)
   print('          TRAINING LEGEND')
-  print(SUCCESS_SYMBOL + ' = success on last evaluation episode')
-  print(FAIL_SYMBOL + ' = failure on last evaluation episode')
-  print(f'Evaluation occurs every {EVAL_INTERVAL} episodes')
-  print(f'Progress is saved every {SAVE_INTERVAL} episodes')
-  print(f'Videos are rendered every {VIDEO_INTERVAL} episodes')
+  print(SUCCESS_SYMBOL + ' = success on last formative evaluation')
+  print(FAIL_SYMBOL + ' = failure on last formative evaluation')
+  print('')
+  print(f'Formative evaluation occurs every {FORMATIVE_INTERVAL} episodes.')
+  print('This includes logging training metrics for TensorBoard.')
+  print('')
+  print(f'Progress is saved every {SAVE_INTERVAL} episodes.')
+  print('This includes checking mastery and writing checkpoints.')
+  print('')
+  print(f'Summative evaluation occurs every {SUMMATIVE_INTERVAL} episodes.')
+  print('This includes saving policies, rendering videos, and logging results.')
   print('#' * 65 + '\n')
 
 
@@ -67,9 +72,8 @@ class Agent:
           learning_rate=0.0005,
           epsilon_greedy=0.1,
           n_step_update=10,
-          use_categorical=False,
-          use_step_schedule=False,
-          use_learning_rate_schedule=False,
+          use_categorical=True,
+          use_step_schedule=True,
           use_mastery=True):
 
     self.num_actions = num_actions
@@ -86,7 +90,6 @@ class Agent:
     self.n_step_update = n_step_update
     self.use_categorical = use_categorical
     self.use_step_schedule = use_step_schedule
-    self.use_learning_rate_schedule = use_learning_rate_schedule
     self.use_mastery = use_mastery
 
     # variable for determining learning target mastery
@@ -112,12 +115,23 @@ class Agent:
     self.checkpointer.initialize_or_restore()
 
     # defining other training items dependent on checkpointer parameters
-    self.tf_train_env, self.py_eval_env, self.tf_eval_env = self.build_envs()
+    self.py_env, self.tf_env = self.build_env()
     self.driver, self.iterator = self.build_driver()
+
+  @property
+  def env_params(self):
+    """Return dictionary of environment parameters."""
+    return {'monster_speed': self.monster_speed.numpy().item(),
+            'timeout_factor': self.timeout_factor,
+            'step_size': self.step_size.numpy().item(),
+            'num_actions': self.num_actions,
+            'use_mini_rewards': self.use_mini_rewards,
+            'use_cartesian': self.use_cartesian,
+            'use_noisy_start': self.use_noisy_start}
 
   def reset(self):
     """Reset member variables after updating monster_speed."""
-    self.tf_train_env, self.py_eval_env, self.tf_eval_env = self.build_envs()
+    self.py_env, self.tf_env = self.build_env()
     self.driver, self.iterator = self.build_driver()
 
   def build_dqn_agent(self):
@@ -171,7 +185,6 @@ class Agent:
         epsilon_greedy=self.epsilon_greedy,
         td_errors_loss_fn=common.element_wise_squared_loss,
         train_step_counter=tf.Variable(0, dtype=tf.int64))
-    agent.train = common.function(agent.train)
 
     return q_net, agent
 
@@ -196,29 +209,18 @@ class Agent:
         monster_speed=self.monster_speed,
         step_size=self.step_size)
 
-  def build_envs(self):
+  def build_env(self):
     """Build training and evaluation environments."""
-    params = {'monster_speed': self.monster_speed.numpy().item(),
-              'timeout_factor': self.timeout_factor,
-              'step_size': self.step_size.numpy().item(),
-              'num_actions': self.num_actions,
-              'use_mini_rewards': self.use_mini_rewards,
-              'use_cartesian': self.use_cartesian,
-              'use_noisy_start': self.use_noisy_start}
-    py_train_env = LakeMonsterEnvironment(**params)
-    tf_train_env = TFPyEnvironment(py_train_env)
-
-    params['use_noisy_start'] = False  # don't want noisy start for evaluation
-    py_eval_env = LakeMonsterEnvironment(**params)
-    tf_eval_env = TFPyEnvironment(py_eval_env)
-
-    return tf_train_env, py_eval_env, tf_eval_env
+    params = self.env_params
+    py_env = LakeMonsterEnvironment(**params)
+    tf_env = TFPyEnvironment(py_env)
+    return py_env, tf_env
 
   def build_driver(self):
     """Build elements of the data pipeline."""
     observers = [self.replay_buffer.add_batch]
     driver = DynamicEpisodeDriver(
-        env=self.tf_train_env,
+        env=self.tf_env,
         policy=self.agent.collect_policy,
         observers=observers)
 
@@ -230,60 +232,26 @@ class Agent:
     iterator = iter(dataset)
     return driver, iterator
 
-  def evaluate_agent(self):
-    """Use naive while loop to evaluate policy in single episode."""
-    n_steps = 0
+  def save_checkpoint_and_logs(self, step):
+    """Save checkpoint and write metrics and weights with tf.summary."""
+    self.checkpointer.save(step)  # step is used as name
+    tf.summary.scalar('monster_speed', self.monster_speed, step)
+    tf.summary.scalar('step_size', self.step_size, step)
+    tf.summary.scalar('learning_score', self.learning_score, step)
+    tf.summary.scalar('reward_sum', self.reward_sum, step)
 
-    ts = self.tf_eval_env.reset()
-    n_steps = 0
-    while not ts.is_last():
-      action = self.agent.policy.action(ts)
-      ts = self.tf_eval_env.step(action.action)
-      n_steps += 1
-
-    proportion_steps = n_steps / self.py_eval_env.duration
-    reward = ts.reward.numpy()[0].item()  # item converts to native python type
-    return reward, proportion_steps
-
-  def save_progress(self, step):
-    """Save checkpoints and write tf.summary. Ignore keyboard interruptions."""
-    def save_successfully():
-      self.checkpointer.save(step)  # step is used as name
-      tf.summary.scalar('monster_speed', self.monster_speed, step)
-      tf.summary.scalar('step_size', self.step_size, step)
-      tf.summary.scalar('learning_score', self.learning_score, step)
-      tf.summary.scalar('reward_sum', self.reward_sum, step)
-
-      # self.q_net.layers either has 1 or 2 elements depending on whether q_net
-      # is categorical or not
-      weights = [w for layers in self.q_net.layers for w in layers.get_weights()]
-      for i, w in enumerate(weights):
-        tf.summary.histogram(f'layer{i}', w, step)
-      return True
-
-    is_saved = False
-    tried_to_interrupt = False
-    print('Saving checkpointer and logs to disk ...')
-    while not is_saved:
-      try:
-        is_saved = save_successfully()
-      except KeyboardInterrupt:
-        print('I will interrupt as soon as I am done saving!')
-        tried_to_interrupt = True
-        continue
-    print('Save successful.')
-    if tried_to_interrupt:
-      raise KeyboardInterrupt
+    # self.q_net.layers either has 1 or 2 elements depending on whether q_net
+    # is categorical or not
+    weights = [w for layers in self.q_net.layers for w in layers.get_weights()]
+    for i, w in enumerate(weights):
+      tf.summary.histogram(f'layer{i}', w, step)
 
   def save_policy(self, step):
     """Save strong policy with tf-agent PolicySaver."""
     print('Saving a strong policy.')
-    # saving environment params as metadata in order to reconstruct environment
 
-    metadata = {'monster_speed': self.monster_speed,  # already tf.Variable
-                'step_size': self.step_size,  # already tf.Variable
-                'timeout_factor': tf.Variable(self.timeout_factor),
-                'num_actions': tf.Variable(self.num_actions)}
+    # saving environment params as metadata in order to reconstruct environment
+    metadata = py_to_tf(self.env_params)
     saver = PolicySaver(self.agent.policy,
                         train_step=self.agent.train_step_counter,
                         metadata=metadata,
@@ -294,9 +262,8 @@ class Agent:
     print('Policy saved.')
 
   def run_save(self, step):
-    """Call save_progress and print out key statistics."""
-
-    self.save_progress(step)
+    """Check for mastery and write checkpoints."""
+    self.save_checkpoint_and_logs(step)
     if self.use_mastery:
       self.check_mastery()
     if self.use_step_schedule:
@@ -305,8 +272,8 @@ class Agent:
     print(f'Completed {step} training episodes.')
     print(f'Monster speed: {self.monster_speed.numpy().item():.3f}.')
     print(f'Step size: {self.step_size.numpy().item():.2f}.')
-    print(f'Score over eval period: {self.learning_score} / {NUM_EVALS}')
-    print(f'Avg reward over eval period: {self.reward_sum / NUM_EVALS:.3f}')
+    print(f'Formative passes: {self.learning_score} / {NUM_EVALS}')
+    print(f'Avg reward on last formatives: {self.reward_sum / NUM_EVALS:.3f}')
     self.learning_score = 0
     self.reward_sum = 0
     print('_' * 65)
@@ -325,15 +292,14 @@ class Agent:
 
   def check_step_schedule(self, step):
     """Determine if step_size should be decreased."""
-    if step == 100_000 or step == 200_000:
+    if step % 100_000 == 0:
       print('Decreasing the step size according to the schedule.')
-      self.step_size.assign(tf.multiply(0.5, self.step_size))
+      self.step_size.assign(tf.multiply(0.7, self.step_size))
       self.reset()
 
-  def run_eval(self, step):
-    """Evaluate agent and print out key statistics."""
-    # tracking some statistics every evaluation
-    reward, n_steps = self.evaluate_agent()
+  def run_formative(self, step):
+    """Evaluate agent once, print results, and log metrics for TensorBoard."""
+    reward, n_steps = evaluate_episode(self.agent.policy, self.env_params)
     self.reward_sum += reward
     tf.summary.scalar('reward', reward, step)
     tf.summary.scalar('n_env_steps', n_steps, step)
@@ -343,15 +309,20 @@ class Agent:
       self.learning_score += 1
     else:
       print(FAIL_SYMBOL, end='', flush=True)
-    if (step + EVAL_INTERVAL) % SAVE_INTERVAL == 0:
+    if (step + FORMATIVE_INTERVAL) % SAVE_INTERVAL == 0:
       print('')
 
-  def run_video(self, step):
-    """Save a video and log results."""
-    episode_as_video(self.py_eval_env, self.agent.policy,
-                     f'episode-{step}', self.tf_eval_env)
-    df = build_df_from_tf_logs()
-    log_results(self.uid.numpy().decode(), df.to_dict(orient='list'))
+  def run_summative(self, step):
+    """Render a video of the agent, save a policy, and log results."""
+    print('Creating video ...')
+    episode_as_video(self.agent.policy, self.env_params, f'episode-{step}')
+    print('Evaluating agent ...')
+    monster_speed, n_steps = probe_policy(self.agent.policy, self.env_params)
+    results = {'max_monster_speed': monster_speed,
+               'n_env_steps': n_steps, 'n_episode': step}
+    print('Logging evaluation results ...')
+    log_results(self.uid.numpy().decode(), results)
+    self.save_policy(step)
 
   def train_ad_infinitum(self):
     """Train the agent until interrupted by user."""
@@ -368,11 +339,9 @@ class Agent:
       self.agent.train(experience)
 
       train_step = self.agent.train_step_counter.numpy().item()
-      if train_step % POLICY_INTERVAL == 0:
-        self.save_policy(train_step)
-      if train_step % VIDEO_INTERVAL == 0:
-        self.run_video(train_step)
+      if train_step % FORMATIVE_INTERVAL == 0:
+        self.run_formative(train_step)
+      if train_step % SUMMATIVE_INTERVAL == 0:
+        self.run_summative(train_step)
       if train_step % SAVE_INTERVAL == 0:
         self.run_save(train_step)
-      if train_step % EVAL_INTERVAL == 0:
-        self.run_eval(train_step)

@@ -116,7 +116,7 @@ There are a number of parameters and hyperparameters involved in both the enviro
 - `epsilon_greedy` -- control the amount of exploration in DQN training
 - `n_step_update` -- the number of steps to look ahead when computing loss of Q-values
 - `use_categorical` -- see this TensorFlow [tutorial](https://www.tensorflow.org/agents/tutorials/9_c51_tutorial)
-- `use_step_schedule`, `use_learning_rate_schedule`, `use_mastery` -- see [Modifying Parameters](#modifying-parameters)
+- `use_step_schedule` and `use_mastery` -- see [Modifying Parameters](#modifying-parameters)
 
 As `num_actions` and `timeout_factor` grow large and `step_size` approaches 0, the discrete lake-monster environment approaches the idealized lake-monster continuous-motion environment. There is a natural trade-off as the discrete environment tends towards a continuous-motion environment. As `num_actions` grows, the output dimension of the neural network grows, thereby increasing the overall complexity of the network. Additionally, DQN exploration grows linearly in `num_actions`. As a result, the policy takes longer to train. As `step_size` becomes small, the agent makes slower progress toward reaching the shoreline. Each episode takes longer to run, and the entire training process slows. As `timeout_factor` increases, an agent may spend additional time wandering without progress, thereby slowing learning. Conversely, as the environment tends toward one of continuous-motion, the agent is afforded more freedom in its movement which can allow it to perform better after extensive training.
 
@@ -134,7 +134,7 @@ On the other hand, some parameters can be modified without changing the structur
 
 When training an agent, we often use a _mastery-based_ approach. In such an approach, an agent initially encounters a slow monster. Once the agent has shown mastery in this easier environment, the speed of the monster is increased. In this way, the agent is always paired with a monster whose speed perfectly matches the ability of the agent.
 
-Extending this idea, the parameters `use_step_schedule`, `use_learning_rate_schedule`, and `use_mastery` modify parameters over the course of training. Utilizing a mastery-based approach often leads to better learning outcomes. See [Results](#results) for a discussion.
+Extending this idea, the parameters `use_step_schedule` and `use_mastery` modify parameters over the course of training. Utilizing a mastery-based approach often leads to better learning outcomes. See [Results](#results) for a discussion.
 
 Agent policies are periodically saved (see [Usage](#usage)) for later use. A well-trained policy can be revived and evaluated with modified parameters. The agents who received extensive training can often succeed when paired with high speed monsters simply by pushing environment parameters in the direction of continuous motion.
 

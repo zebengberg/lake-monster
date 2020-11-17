@@ -8,11 +8,13 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 import imageio
+# including this import for pipreqs
+import imageio_ffmpeg  # pylint: disable=unused-import
 import pygifsicle
-from tf_agents.environments import tf_py_environment
+from tf_agents.environments.tf_py_environment import TFPyEnvironment
 from tf_agents.policies import random_py_policy, scripted_py_policy
 from environment import LakeMonsterEnvironment
-from renderer import episode_as_gif, render_many_agents, render_agent_path
+from utils import tf_to_py
 
 
 # suppressing some annoying warnings
@@ -24,26 +26,27 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 def create_random_gif():
   """Create a gif showing a random policy."""
-  env = LakeMonsterEnvironment(
-      monster_speed=0.7, timeout_factor=20, step_size=0.03, num_actions=8)
+  env_params = {'monster_speed': 0.7, 'timeout_factor': 20,
+                'step_size': 0.03, 'num_actions': 8}
+  env = LakeMonsterEnvironment(**env_params)
   policy = random_py_policy.RandomPyPolicy(time_step_spec=None,
                                            action_spec=env.action_spec())
-  episode_as_gif(py_env=env, policy=policy, filepath='assets/random.gif')
+  episode_as_gif(policy, env_params, filepath='assets/random.gif')
 
 
 def create_action_gif():
   """Create a gif showing discretization of agent actions."""
-  num_actions = 8  # must be even
-  env = LakeMonsterEnvironment(monster_speed=0.0, timeout_factor=8,
-                               step_size=0.5, num_actions=num_actions)
+  num_actions = 8  # should be even
+  env_params = {'monster_speed': 0.0, 'timeout_factor': 8,
+                'step_size': 0.5, 'num_actions': num_actions}
+  env = LakeMonsterEnvironment(**env_params)
   action_script = []
   for i in range(num_actions):
     action_script.append((1, i))  # step forward
     action_script.append((1, (i + num_actions // 2) % num_actions))  # back
   policy = scripted_py_policy.ScriptedPyPolicy(
       time_step_spec=None, action_spec=env.action_spec(), action_script=action_script)
-  episode_as_gif(py_env=env, policy=policy,
-                 filepath='assets/actions.gif', fps=1)
+  episode_as_gif(policy, env_params, filepath='assets/actions.gif', fps=1)
 
 
 def create_policy_gif(policy_path, asset_path, new_params=None):
@@ -51,17 +54,58 @@ def create_policy_gif(policy_path, asset_path, new_params=None):
 
   policy = tf.saved_model.load(policy_path)
   env_params = policy.get_metadata()
-  for k, v in env_params.items():
-    # casting from tf.Variable to python native
-    env_params[k] = v.numpy().item()
+  env_params = tf_to_py(env_params)
+
   # overwriting some parameters
   if new_params:
     for k, v in new_params.items():
       env_params[k] = v
 
+  episode_as_gif(policy, env_params, asset_path, fps=10)
+
+
+def episode_as_video(policy, env_params, filename, fps=10):
+  """Create mp4 video through py_environment render method."""
   py_env = LakeMonsterEnvironment(**env_params)
-  tf_env = tf_py_environment.TFPyEnvironment(py_env)
-  episode_as_gif(py_env, policy, asset_path, tf_env=tf_env, fps=10)
+  tf_env = TFPyEnvironment(py_env)
+
+  with imageio.get_writer('tmp.mp4', fps=fps) as video:
+    time_step = tf_env.reset()
+    video.append_data(py_env.render())
+    while not time_step.is_last():
+      action = policy.action(time_step).action
+      time_step = tf_env.step(action)
+      video.append_data(py_env.render())
+    for _ in range(3 * fps):  # play for 3 more seconds
+      video.append_data(py_env.render())
+
+  # giving video file a more descriptive name
+  _, result = py_env.determine_reward()
+  if not os.path.exists('videos/'):
+    os.mkdir('videos/')
+  filename = os.path.join('videos/', filename + '-' + result + '.mp4')
+  os.rename('tmp.mp4', filename)
+
+
+def episode_as_gif(policy, env_params, filepath, fps=30):
+  """Create gif through py_environment render method."""
+
+  py_env = LakeMonsterEnvironment(**env_params)
+  tf_env = TFPyEnvironment(py_env)
+
+  with imageio.get_writer(filepath, mode='I', fps=fps) as gif:
+    time_step = tf_env.reset()
+    # using the policy_state to deal with scripted_policy possibility
+    policy_state = policy.get_initial_state(batch_size=1)
+    gif.append_data(py_env.render())
+    while not time_step.is_last():
+      action = policy.action(time_step, policy_state)
+      time_step = tf_env.step(action.action)
+      policy_state = action.state
+      gif.append_data(py_env.render())
+    for _ in range(fps):  # play for 1 more seconds
+      gif.append_data(py_env.render())
+  pygifsicle.optimize(filepath)
 
 
 def create_policy_gif_with_path(policy_path, asset_path, new_params=None):
@@ -69,16 +113,15 @@ def create_policy_gif_with_path(policy_path, asset_path, new_params=None):
 
   policy = tf.saved_model.load(policy_path)
   env_params = policy.get_metadata()
-  for k, v in env_params.items():
-    # casting from tf.Variable to python native
-    env_params[k] = v.numpy().item()
+  env_params = tf_to_py(env_params)
+
   # overwriting parameters
   if new_params:
     for k, v in new_params.items():
       env_params[k] = v
 
   py_env = LakeMonsterEnvironment(**env_params)
-  tf_env = tf_py_environment.TFPyEnvironment(py_env)
+  tf_env = TFPyEnvironment(py_env)
 
   time_step = tf_env.reset()
   path = []
@@ -111,14 +154,13 @@ def create_many_policy_gif():
     color = (np.random.randint(256), np.random.randint(128), 0)
     policy = tf.saved_model.load(policy_path)
     env_params = policy.get_metadata()
-    for k, v in env_params.items():
-      # casting from tf.Variable to python native
-      env_params[k] = v.numpy().item()
+    env_params = tf_to_py(env_params)
+
     # overwriting parameters
     env_params['step_size'] = step_size
     env_params['monster_speed'] = monster_speed
     py_env = LakeMonsterEnvironment(**env_params)
-    tf_env = tf_py_environment.TFPyEnvironment(py_env)
+    tf_env = TFPyEnvironment(py_env)
 
     time_step = tf_env.reset()
     agent_positions = {}
