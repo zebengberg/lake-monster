@@ -4,6 +4,7 @@ import os
 import random
 import json
 import glob
+import shutil
 import tensorflow as tf
 import pandas as pd
 
@@ -19,9 +20,9 @@ param_universe = {
     'use_noisy_start': [False, True],
 
     # agent params
-    'fc_layer_params': [(10, 10), (20, 20), (50, 50), (100, 100), (200, 200)],
+    'fc_layer_params': [(10, 10), (20, 20), (50, 50), (100, 100)],
     'dropout_layer_params': [None, (0.1, 0.1), (0.4, 0.4)],
-    'learning_rate': [0.001, 0.0005, 0.0002],
+    'learning_rate': [0.002, 0.001, 0.0005],
     'epsilon_greedy': [0.3, 0.1, 0.03],
     'n_step_update': [1, 5, 10],
     'use_categorical': [False, True],
@@ -76,13 +77,13 @@ def log_results(uid, results):
 
   with open('results.json') as f:
     data = json.load(f)
-    # making a backup copy first
-  os.rename('results.json', 'backup.json')
 
   assert uid in data
   # possibly overwriting an existing entry
   data[uid]['results'].append(results)
 
+  # making a backup copy first
+  os.rename('results.json', 'backup.json')
   with open('results.json', 'w') as f:
     json.dump(data, f, indent=2)
   # remove backup copy
@@ -90,8 +91,27 @@ def log_results(uid, results):
 
 
 def merge_results_and_policies(new_results_path, new_policies_path):
-  pass
-# TODO: write this
+  """Merge results and policies collected elsewhere."""
+  shutil.copytree(new_policies_path, 'policies', dirs_exist_ok=True)
+  with open('new_results.json') as f:
+    new_data = json.load(f)
+
+  with open('results.json') as f:
+    data = json.load(f)
+
+  os.rename('results.json', 'backup.json')
+  for k, v in new_data:
+    if k in data:
+      print('Redundant UUID:', k)
+      raise ValueError('Not expecting same UUID to exist in both results.json')
+    data[k] = v
+
+  # making a backup copy first
+  os.rename('results.json', 'backup.json')
+  with open('results.json', 'w') as f:
+    json.dump(data, f, indent=2)
+  # remove backup copy
+  os.remove('backup.json')
 
 
 def tf_to_py(d):

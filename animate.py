@@ -1,4 +1,4 @@
-"""A module to create assets for the readme."""
+"""A module to create videos, gifs, and assets for the readme."""
 
 import os
 import glob
@@ -15,6 +15,7 @@ from tf_agents.environments.tf_py_environment import TFPyEnvironment
 from tf_agents.policies import random_py_policy, scripted_py_policy
 from environment import LakeMonsterEnvironment
 from utils import tf_to_py
+from render import render_many_agents
 
 
 # suppressing some annoying warnings

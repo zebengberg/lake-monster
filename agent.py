@@ -309,19 +309,19 @@ class Agent:
       self.learning_score += 1
     else:
       print(FAIL_SYMBOL, end='', flush=True)
-    if (step + FORMATIVE_INTERVAL) % SAVE_INTERVAL == 0:
+    if step % SAVE_INTERVAL == 0:
       print('')
 
   def run_summative(self, step):
     """Render a video of the agent, save a policy, and log results."""
     print('Creating video ...')
     episode_as_video(self.agent.policy, self.env_params, f'episode-{step}')
-    print('Evaluating agent ...')
-    monster_speed, n_steps = probe_policy(self.agent.policy, self.env_params)
-    results = {'max_monster_speed': monster_speed,
-               'n_env_steps': n_steps, 'n_episode': step}
+    print('Evaluating agent. You will see several lines of dots ...')
+    result = probe_policy(self.agent.policy, self.env_params)
+    result['n_episode'] = step
     print('Logging evaluation results ...')
-    log_results(self.uid.numpy().decode(), results)
+    print(result)
+    log_results(self.uid.numpy().decode(), result)
     self.save_policy(step)
 
   def train_ad_infinitum(self):
