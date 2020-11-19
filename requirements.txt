@@ -1,12 +1,12 @@
-tensorflow==2.4.0rc1
-absl_py==0.11.0
+pandas==1.1.4
 tqdm==4.51.0
 numpy==1.19.4
+imageio==2.9.0
+tensorflow==2.4.0rc1
 tensorboard==2.4.0
-imageio_ffmpeg==0.4.2
+absl_py==0.11.0
 pygifsicle==1.0.1
 tf_agents==0.6.0
-pandas==1.1.4
-imageio==2.9.0
+imageio_ffmpeg==0.4.2
 absl==0.0
 Pillow==8.0.1
