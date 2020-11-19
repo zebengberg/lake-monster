@@ -62,7 +62,7 @@ class Agent:
           uid,
           num_actions=8,
           initial_step_size=0.1,
-          initial_monster_speed=3.3,
+          initial_monster_speed=3.2,
           timeout_factor=3.0,
           use_mini_rewards=True,
           use_cartesian=False,
@@ -72,7 +72,7 @@ class Agent:
           learning_rate=0.0005,
           epsilon_greedy=0.1,
           n_step_update=10,
-          use_categorical=True,
+          use_categorical=False,
           use_step_schedule=True,
           use_mastery=True):
 

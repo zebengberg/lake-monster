@@ -15,7 +15,7 @@ from tf_agents.environments.tf_py_environment import TFPyEnvironment
 from tf_agents.policies import random_py_policy, scripted_py_policy
 from environment import LakeMonsterEnvironment
 from utils import tf_to_py
-from render import render_many_agents
+from render import render_many_agents, render_agent_path
 
 
 # suppressing some annoying warnings

@@ -9,3 +9,8 @@ logs/
 policies/
 results.json
 agent_id.txt
+
+# pyinstaller stuff
+*.spec
+build/
+dist/

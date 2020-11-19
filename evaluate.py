@@ -17,7 +17,7 @@ def evaluate_episode(policy, env_params):
     n_steps += 1
 
   reward = ts.reward.numpy().item()
-  return reward, n_steps
+  return reward, n_steps * py_env.step_size
 
 
 def probe_policy_const_steps(policy, env_params):
