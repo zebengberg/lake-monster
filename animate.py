@@ -28,7 +28,7 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 def create_random_gif():
   """Create a gif showing a random policy."""
   env_params = {'monster_speed': 0.7, 'timeout_factor': 20,
-                'step_size': 0.03, 'num_actions': 8}
+                'step_size': 0.03, 'n_actions': 8}
   env = LakeMonsterEnvironment(**env_params)
   policy = random_py_policy.RandomPyPolicy(time_step_spec=None,
                                            action_spec=env.action_spec())
@@ -37,14 +37,14 @@ def create_random_gif():
 
 def create_action_gif():
   """Create a gif showing discretization of agent actions."""
-  num_actions = 8  # should be even
+  n_actions = 8  # should be even
   env_params = {'monster_speed': 0.0, 'timeout_factor': 8,
-                'step_size': 0.5, 'num_actions': num_actions}
+                'step_size': 0.5, 'n_actions': n_actions}
   env = LakeMonsterEnvironment(**env_params)
   action_script = []
-  for i in range(num_actions):
+  for i in range(n_actions):
     action_script.append((1, i))  # step forward
-    action_script.append((1, (i + num_actions // 2) % num_actions))  # back
+    action_script.append((1, (i + n_actions // 2) % n_actions))  # back
   policy = scripted_py_policy.ScriptedPyPolicy(
       time_step_spec=None, action_spec=env.action_spec(), action_script=action_script)
   episode_as_gif(policy, env_params, filepath='assets/actions.gif', fps=1)

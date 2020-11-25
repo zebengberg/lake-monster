@@ -63,9 +63,9 @@ def test_agent(uid, params=None):
   for arr, size in zip(weights[::2], a.fc_layer_params):
     assert arr.shape[1] == size
   if a.use_categorical:
-    assert weights[-2].shape[1] == a.num_actions * a.q_net.num_atoms
+    assert weights[-2].shape[1] == a.n_actions * a.q_net.num_atoms
   else:
-    assert weights[-2].shape[1] == a.num_actions
+    assert weights[-2].shape[1] == a.n_actions
 
   # agent parameters
   assert a.agent._epsilon_greedy == a.epsilon_greedy
@@ -73,10 +73,10 @@ def test_agent(uid, params=None):
 
   # environment parameters
   n = a.tf_env.action_spec().maximum - a.tf_env.action_spec().minimum
-  assert a.num_actions == n + 1
+  assert a.n_actions == n + 1
   assert a.monster_speed.numpy().item() == a.py_env.monster_speed
   assert a.timeout_factor == a.py_env.timeout_factor
-  assert a.num_actions == a.py_env.num_actions
+  assert a.n_actions == a.py_env.n_actions
   assert a.step_size.numpy().item() == a.py_env.step_size
   assert a.use_mini_rewards == a.py_env.use_mini_rewards
   assert a.use_cartesian == a.py_env.use_cartesian

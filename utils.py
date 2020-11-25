@@ -11,7 +11,7 @@ import pandas as pd
 # sorted from least complexity to most complexity
 param_universe = {
     # environment params
-    'num_actions': [4, 8, 16, 32],
+    'n_actions': [4, 8, 16, 32],
     'initial_step_size': [0.4, 0.2, 0.1, 0.05],
     'initial_monster_speed': [2.5, 3.0, 3.5, 4.0],
     'timeout_factor': [1.5, 2.0, 2.5, 3.0],
@@ -90,21 +90,20 @@ def log_results(uid, results):
   os.remove('backup.json')
 
 
-def merge_results_and_policies(new_results_path, new_policies_path):
-  """Merge results and policies collected elsewhere."""
-  shutil.copytree(new_policies_path, 'policies', dirs_exist_ok=True)
-  with open('new_results.json') as f:
+def merge_results(new_results_path):
+  """Merge results collected elsewhere."""
+  with open(new_results_path) as f:
     new_data = json.load(f)
 
   with open('results.json') as f:
     data = json.load(f)
 
-  os.rename('results.json', 'backup.json')
-  for k, v in new_data:
+  for k, v in new_data.items():
     if k in data:
       print('Redundant UUID:', k)
-      raise ValueError('Not expecting same UUID to exist in both results.json')
-    data[k] = v
+      print('Skipping this merge.')
+    else:
+      data[k] = v
 
   # making a backup copy first
   os.rename('results.json', 'backup.json')

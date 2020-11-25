@@ -1,6 +1,8 @@
 """A module for evaluating policies."""
 
-from tqdm import tqdm
+import json
+import pandas as pd
+import matplotlib.pyplot as plt
 from tf_agents.environments.tf_py_environment import TFPyEnvironment
 from environment import LakeMonsterEnvironment
 
@@ -70,3 +72,51 @@ def probe_policy(policy, env_params):
       result['n_env_steps'] = n_env_steps
 
   return result
+
+
+def result_df():
+  """Return DataFrame of monster speed data in results.json."""
+  with open('results.json') as f:
+    data = json.load(f)
+  dfs = []
+  params = {}
+  for uid in data:
+    params[uid] = data[uid]['params']
+    results = data[uid]['results']
+    if results:
+      df = pd.DataFrame(results)
+      df = df.set_index('n_episode', drop=True)
+      df = df.drop(['step_size', 'n_env_steps'], axis=1)
+      df = df.rename(columns={'monster_speed': uid})
+      dfs.append(df)
+  return pd.concat(dfs, axis=1), params
+
+
+def plot_results():
+  """Plot evaluation monter speeds over training."""
+  df, _ = result_df()
+  df = df[df.index <= 500_000]
+  df = df.rolling(50).mean()
+  df.plot(legend=False)
+  plt.ylabel('monster_speed')
+  plt.title('evaluation scores over training')
+  plt.show()
+
+
+def get_strongest_policies():
+  """Search the results for policies with high maximum evaluation."""
+
+  threshold = 4.0
+  df, params = result_df()
+  strong = df.max() > threshold
+  policies = list(strong[strong].index)
+  for p in policies:
+    print('#' * 65)
+    print('max monster_speed:', df[p].max())
+    for k, v in params[p].items():
+      print(k, v)
+
+
+get_strongest_policies()
+
+# plot_results()

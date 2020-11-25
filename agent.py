@@ -60,23 +60,23 @@ class Agent:
   def __init__(
           self,
           uid,
-          num_actions=8,
+          n_actions=16,
           initial_step_size=0.1,
-          initial_monster_speed=3.2,
+          initial_monster_speed=4.0,
           timeout_factor=3.0,
           use_mini_rewards=True,
           use_cartesian=False,
           use_noisy_start=False,
-          fc_layer_params=(50, 50),
+          fc_layer_params=(100, 100),
           dropout_layer_params=None,
           learning_rate=0.0005,
-          epsilon_greedy=0.1,
+          epsilon_greedy=0.03,
           n_step_update=10,
           use_categorical=False,
           use_step_schedule=True,
           use_mastery=True):
 
-    self.num_actions = num_actions
+    self.n_actions = n_actions
     self.initial_step_size = initial_step_size
     self.initial_monster_speed = initial_monster_speed
     self.timeout_factor = timeout_factor
@@ -124,7 +124,7 @@ class Agent:
     return {'monster_speed': self.monster_speed.numpy().item(),
             'timeout_factor': self.timeout_factor,
             'step_size': self.step_size.numpy().item(),
-            'num_actions': self.num_actions,
+            'n_actions': self.n_actions,
             'use_mini_rewards': self.use_mini_rewards,
             'use_cartesian': self.use_cartesian,
             'use_noisy_start': self.use_noisy_start}
@@ -136,7 +136,7 @@ class Agent:
 
   def build_dqn_agent(self):
     """Build DQN agent with QNetwork."""
-    py_temp_env = LakeMonsterEnvironment(num_actions=self.num_actions,
+    py_temp_env = LakeMonsterEnvironment(n_actions=self.n_actions,
                                          use_cartesian=self.use_cartesian)
     tf_temp_env = TFPyEnvironment(py_temp_env)
 
@@ -161,7 +161,7 @@ class Agent:
 
   def build_categorical_dqn_agent(self):
     """Build categorical DQN agent with CategoricalQNetwork."""
-    py_temp_env = LakeMonsterEnvironment(num_actions=self.num_actions,
+    py_temp_env = LakeMonsterEnvironment(n_actions=self.n_actions,
                                          use_cartesian=self.use_cartesian)
     tf_temp_env = TFPyEnvironment(py_temp_env)
 

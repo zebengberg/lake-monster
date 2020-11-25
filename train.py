@@ -107,7 +107,7 @@ def parse_args():
   if len(args) > 2:
     raise ValueError('Only expecting a single command line argument.')
 
-  elif len(args) == 2:
+  if len(args) == 2:
     arg = args[1]
     arg_dict = {'random': generate_random,
                 'default': generate_default,

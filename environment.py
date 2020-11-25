@@ -8,7 +8,7 @@ from tf_agents.trajectories import time_step
 from render import renderer
 
 
-class LakeMonsterEnvironment(PyEnvironment):  # pylint: disable=abstract-method
+class LakeMonsterEnvironment(PyEnvironment):
   """A tf-agent environment for the lake monster problem. In this environment,
   the monster remains fixed at the point (1, 0), and the player is confined to
   swim inside of the unit disk. After an action takes place, the player is
@@ -19,7 +19,7 @@ class LakeMonsterEnvironment(PyEnvironment):  # pylint: disable=abstract-method
                monster_speed=1.0,
                timeout_factor=3,
                step_size=0.1,
-               num_actions=4,
+               n_actions=4,
                use_mini_rewards=False,
                use_cartesian=False,
                use_noisy_start=False):
@@ -28,7 +28,7 @@ class LakeMonsterEnvironment(PyEnvironment):  # pylint: disable=abstract-method
     self.monster_speed = monster_speed
     self.timeout_factor = timeout_factor
     self.step_size = step_size
-    self.num_actions = num_actions
+    self.n_actions = n_actions
     self.use_mini_rewards = use_mini_rewards
     self.use_cartesian = use_cartesian
     self.use_noisy_start = use_noisy_start
@@ -38,9 +38,9 @@ class LakeMonsterEnvironment(PyEnvironment):  # pylint: disable=abstract-method
 
     # building the action_to_direction list
     def to_vector(action):
-      return np.array((np.cos(action * 2 * np.pi / num_actions),
-                       np.sin(action * 2 * np.pi / num_actions)))
-    self.action_to_direction = [to_vector(a) for a in range(num_actions)]
+      return np.array((np.cos(action * 2 * np.pi / n_actions),
+                       np.sin(action * 2 * np.pi / n_actions)))
+    self.action_to_direction = [to_vector(a) for a in range(n_actions)]
 
     # building the rotation matrix
     self.monster_arc = self.step_size * self.monster_speed
@@ -48,7 +48,7 @@ class LakeMonsterEnvironment(PyEnvironment):  # pylint: disable=abstract-method
     self.ccw_rot_matrix = np.array(((c, -s), (s, c)))
     self.cw_rot_matrix = np.array(((c, s), (-s, c)))
 
-    self.num_steps = 0
+    self.n_steps = 0
     self.position = self.get_start_position()
 
     self.highest_r_attained = 0.0
@@ -60,7 +60,7 @@ class LakeMonsterEnvironment(PyEnvironment):  # pylint: disable=abstract-method
     self.prev_action_vector = None
 
     self._action_spec = BoundedArraySpec(
-        shape=(), dtype=np.int32, minimum=0, maximum=num_actions - 1,
+        shape=(), dtype=np.int32, minimum=0, maximum=n_actions - 1,
         name='action')
     self._observation_spec = BoundedArraySpec(
         shape=self._state.shape, dtype=np.float32, minimum=-10, maximum=10,
@@ -80,7 +80,7 @@ class LakeMonsterEnvironment(PyEnvironment):  # pylint: disable=abstract-method
   def _reset(self):
     self._episode_ended = False
     self.position = np.array((0.0, 0.0), dtype=np.float32)
-    self.num_steps = 0
+    self.n_steps = 0
     self.highest_r_attained = 0.0
     self.is_monster_caught_up = False
     self.monster_angle = 0.0
@@ -102,7 +102,7 @@ class LakeMonsterEnvironment(PyEnvironment):  # pylint: disable=abstract-method
   @property
   def step_proportion(self):
     """Return proportion of number of steps taken to number of steps allowed."""
-    return self.num_steps / self.duration
+    return self.n_steps / self.duration
 
   @property
   def theta(self):
@@ -114,6 +114,17 @@ class LakeMonsterEnvironment(PyEnvironment):  # pylint: disable=abstract-method
 
   def observation_spec(self):
     return self._observation_spec
+
+  def get_info(self):
+    print('Not implemented')
+    return None
+
+  def get_state(self):
+    return self._state
+
+  def set_state(self, state):
+    print('Not implemented')
+    return None
 
   def rotate(self):
     """Update the position after action applied."""
@@ -153,7 +164,7 @@ class LakeMonsterEnvironment(PyEnvironment):  # pylint: disable=abstract-method
     self.prev_action_vector = action_vector
     self.position += action_vector
     self.rotate()
-    self.num_steps += 1
+    self.n_steps += 1
 
     # made it out of the lake
     if self.r >= 1.0 or self.step_proportion >= 1:
@@ -188,9 +199,9 @@ class LakeMonsterEnvironment(PyEnvironment):  # pylint: disable=abstract-method
               'prev_action_vector': self.prev_action_vector,
               'result': result,
               'reward': reward,
-              'step': self.num_steps,
+              'step': self.n_steps,
               'monster_speed': self.monster_speed,
-              'num_actions': self.num_actions,
+              'n_actions': self.n_actions,
               'step_size': self.step_size,
               'is_caught': self.is_monster_caught_up}
 
@@ -202,3 +213,4 @@ class LakeMonsterEnvironment(PyEnvironment):  # pylint: disable=abstract-method
     if mode == 'rgb_array':
       return np.array(im)
     im.show()
+    return None

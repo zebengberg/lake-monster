@@ -18,7 +18,7 @@ TEST_VIDEO_FILENAME = 'test'
 params = {'monster_speed': 0.7,
           'timeout_factor': 20,
           'step_size': 0.05,
-          'num_actions': 20,
+          'n_actions': 20,
           'use_mini_rewards': True,
           'use_cartesian': True,
           'use_noisy_start': True}
@@ -44,7 +44,7 @@ def test_py_environment_with_random(num_episodes=1000):
 
   for _ in tqdm(range(num_episodes)):
     while not ts.is_last():
-      action = np.random.randint(0, params['num_actions'])
+      action = np.random.randint(0, params['n_actions'])
       ts = env.step(action)
 
     reward = ts.reward

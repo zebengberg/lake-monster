@@ -49,11 +49,11 @@ def arrow_segments(vector):
   return lines
 
 
-def draw_text(draw, monster_speed, step, step_size, num_actions, position=None):
+def draw_text(draw, monster_speed, step, step_size, n_actions, position=None):
   """Draw informational text to image."""
   monster_text = f'MONSTER SPEED: {monster_speed:.3f}'
   step_text = f'STEP: {step}'
-  actions_text = f'NUMBER OF ACTIONS: {num_actions}'
+  actions_text = f'NUMBER OF ACTIONS: {n_actions}'
   size_text = f'STEP SIZE: {step_size:.3f}'
 
   draw.text((10, SIZE - 20), monster_text, (0, 0, 0))
@@ -73,7 +73,7 @@ def renderer(monster_angle,
              reward,
              step,
              monster_speed,
-             num_actions,
+             n_actions,
              step_size,
              is_caught,
              return_real=False):
@@ -89,7 +89,7 @@ def renderer(monster_angle,
   draw.ellipse((CENTER - RADIUS,) * 2 + (CENTER + RADIUS,) * 2,
                fill=(0, 0, 255), outline=(0, 0, 0), width=4)
   draw.ellipse((CENTER - 2,) * 2 + (CENTER + 2,) * 2, fill=(0, 0, 0))
-  draw_text(draw, monster_speed, step, step_size, num_actions, position)
+  draw_text(draw, monster_speed, step, step_size, n_actions, position)
 
   draw.ellipse(coords_to_rect(real_position), fill=RED)
   draw.ellipse(angle_to_rect(monster_angle), fill=(40, 200, 40))
@@ -129,14 +129,14 @@ def render_agent_path(im, path):
   return im
 
 
-def render_many_agents(positions, colors, step, step_size, num_actions, monster_speed):
+def render_many_agents(positions, colors, step, step_size, n_actions, monster_speed):
   """Keep monster at (1, 0) and render agent positions."""
   im = Image.new('RGB', (480, 480), (237, 201, 175))
   draw = ImageDraw.Draw(im)
   draw.ellipse((CENTER - RADIUS,) * 2 + (CENTER + RADIUS,) * 2,
                fill=(0, 0, 255), outline=(0, 0, 0), width=4)
   draw.ellipse((CENTER - 2,) * 2 + (CENTER + 2,) * 2, fill=(0, 0, 0))
-  draw_text(draw, monster_speed, step, step_size, num_actions)
+  draw_text(draw, monster_speed, step, step_size, n_actions)
   draw.ellipse(angle_to_rect(0), fill=(40, 200, 40))  # monster themself
 
   for p, c in zip(positions, colors):
