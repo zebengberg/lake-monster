@@ -79,7 +79,6 @@ def test_agent(uid, params=None):
   assert a.n_actions == a.py_env.n_actions
   assert a.step_size.numpy().item() == a.py_env.step_size
   assert a.use_mini_rewards == a.py_env.use_mini_rewards
-  assert a.use_cartesian == a.py_env.use_cartesian
 
   for _ in range(10):
     a.driver.run()
@@ -88,7 +87,7 @@ def test_agent(uid, params=None):
 if __name__ == '__main__':
   if os.path.exists('agent_id.txt'):
     raise NotImplementedError(
-        'Can only test when no partially trained agent exists. Run `clean_knowledge.py`.')
+        'Can only test when no partially trained agent exists. Run `train.py clear`.')
   print('Testing an agent with default parameters')
   name = 'test_agent'
   test_agent(name)

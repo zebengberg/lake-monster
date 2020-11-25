@@ -65,8 +65,6 @@ class Agent:
           initial_monster_speed=4.0,
           timeout_factor=3.0,
           use_mini_rewards=True,
-          use_cartesian=False,
-          use_noisy_start=False,
           fc_layer_params=(100, 100),
           dropout_layer_params=None,
           learning_rate=0.0005,
@@ -81,8 +79,6 @@ class Agent:
     self.initial_monster_speed = initial_monster_speed
     self.timeout_factor = timeout_factor
     self.use_mini_rewards = use_mini_rewards
-    self.use_cartesian = use_cartesian
-    self.use_noisy_start = use_noisy_start
     self.fc_layer_params = fc_layer_params
     self.dropout_layer_params = dropout_layer_params
     self.learning_rate = learning_rate
@@ -125,9 +121,7 @@ class Agent:
             'timeout_factor': self.timeout_factor,
             'step_size': self.step_size.numpy().item(),
             'n_actions': self.n_actions,
-            'use_mini_rewards': self.use_mini_rewards,
-            'use_cartesian': self.use_cartesian,
-            'use_noisy_start': self.use_noisy_start}
+            'use_mini_rewards': self.use_mini_rewards}
 
   def reset(self):
     """Reset member variables after updating monster_speed."""
@@ -136,8 +130,7 @@ class Agent:
 
   def build_dqn_agent(self):
     """Build DQN agent with QNetwork."""
-    py_temp_env = LakeMonsterEnvironment(n_actions=self.n_actions,
-                                         use_cartesian=self.use_cartesian)
+    py_temp_env = LakeMonsterEnvironment(n_actions=self.n_actions)
     tf_temp_env = TFPyEnvironment(py_temp_env)
 
     q_net = q_network.QNetwork(
@@ -161,8 +154,7 @@ class Agent:
 
   def build_categorical_dqn_agent(self):
     """Build categorical DQN agent with CategoricalQNetwork."""
-    py_temp_env = LakeMonsterEnvironment(n_actions=self.n_actions,
-                                         use_cartesian=self.use_cartesian)
+    py_temp_env = LakeMonsterEnvironment(n_actions=self.n_actions)
     tf_temp_env = TFPyEnvironment(py_temp_env)
 
     if self.dropout_layer_params is not None:

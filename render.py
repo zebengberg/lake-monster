@@ -9,6 +9,8 @@ SIZE = 480
 CENTER = SIZE // 2
 RADIUS = 200
 RED = (250, 50, 0)
+BLACK = (0,) * 3
+GREEN = (40, 200, 40)
 
 
 def coords_to_rect(coords):
@@ -49,26 +51,27 @@ def arrow_segments(vector):
   return lines
 
 
-def draw_text(draw, monster_speed, step, step_size, n_actions, position=None):
+def draw_text(draw, monster_speed, step, step_size, n_actions, r=None):
   """Draw informational text to image."""
   monster_text = f'MONSTER SPEED: {monster_speed:.3f}'
   step_text = f'STEP: {step}'
   actions_text = f'NUMBER OF ACTIONS: {n_actions}'
   size_text = f'STEP SIZE: {step_size:.3f}'
 
-  draw.text((10, SIZE - 20), monster_text, (0, 0, 0))
-  draw.text((10, SIZE - 40), actions_text, (0, 0, 0))
-  draw.text((10, SIZE - 60), size_text, (0, 0, 0))
-  draw.text((CENTER - 20, SIZE - 20), step_text, (0, 0, 0))
-  if position is not None:
-    radius_text = f'RADIUS: {np.linalg.norm(position):.3f}'
-    draw.text((CENTER + 80, SIZE - 20), radius_text, (0, 0, 0))
+  draw.text((10, SIZE - 20), monster_text, BLACK)
+  draw.text((10, SIZE - 40), actions_text, BLACK)
+  draw.text((10, SIZE - 60), size_text, BLACK)
+  draw.text((CENTER - 20, SIZE - 20), step_text, BLACK)
+
+  if r is not None:
+    radius_text = f'RADIUS: {r:.3f}'
+    draw.text((CENTER + 80, SIZE - 20), radius_text, BLACK)
 
 
-def renderer(monster_angle,
-             prev_monster_angle,
-             position,
-             prev_action_vector,
+def renderer(r,
+             total_agent_rotation,
+             total_monster_rotation,
+             action_vector,
              result,
              reward,
              step,
@@ -76,33 +79,36 @@ def renderer(monster_angle,
              n_actions,
              step_size,
              is_caught,
-             return_real=False):
+             return_real=False,
+             multi_monster_rotations=None):
   """Render an environment state as a PIL image."""
 
-  c, s = np.cos(monster_angle), np.sin(monster_angle)
-  rot_matrix = np.array(((c, -s), (s, c)))
-  real_position = np.dot(rot_matrix, position)
+  c, s = np.cos(total_agent_rotation), np.sin(total_agent_rotation)
+  agent_rot_matrix = np.array(((c, -s), (s, c)))
+  agent_position = np.dot(agent_rot_matrix, (r, 0))
 
   im = Image.new('RGB', (480, 480), (237, 201, 175))
   draw = ImageDraw.Draw(im)
 
   draw.ellipse((CENTER - RADIUS,) * 2 + (CENTER + RADIUS,) * 2,
-               fill=(0, 0, 255), outline=(0, 0, 0), width=4)
-  draw.ellipse((CENTER - 2,) * 2 + (CENTER + 2,) * 2, fill=(0, 0, 0))
-  draw_text(draw, monster_speed, step, step_size, n_actions, position)
+               fill=(0, 0, 255), outline=BLACK, width=4)
+  draw.ellipse((CENTER - 2,) * 2 + (CENTER + 2,) * 2, fill=BLACK)
+  draw_text(draw, monster_speed, step, step_size, n_actions, r)
 
-  draw.ellipse(coords_to_rect(real_position), fill=RED)
-  draw.ellipse(angle_to_rect(monster_angle), fill=(40, 200, 40))
+  draw.ellipse(coords_to_rect(agent_position), fill=RED)
+  if multi_monster_rotations is None:
+    multi_monster_rotations = [total_monster_rotation]
+  for monster in multi_monster_rotations:
+    draw.ellipse(angle_to_rect(monster), fill=GREEN)
 
   # drawing the arrow
-  if prev_action_vector is not None:
+  if action_vector is not None:
     if is_caught:
       color = (255, 150, 0)
     else:
       color = (255, 255, 0)
-    c, s = np.cos(prev_monster_angle), np.sin(prev_monster_angle)
-    prev_rot_matrix = np.array(((c, -s), (s, c)))
-    real_vector = np.dot(prev_rot_matrix, prev_action_vector)
+
+    real_vector = np.dot(agent_rot_matrix, action_vector)
     unit_vector = real_vector / np.linalg.norm(real_vector)
     lines = arrow_segments(unit_vector)
     for line in lines:
@@ -115,7 +121,7 @@ def renderer(monster_angle,
     draw.text((CENTER - 10, CENTER + 50), f'REWARD: {reward:.3f}', white)
 
   if return_real:
-    return im, real_position
+    return im, agent_position
   return im
 
 
@@ -134,10 +140,10 @@ def render_many_agents(positions, colors, step, step_size, n_actions, monster_sp
   im = Image.new('RGB', (480, 480), (237, 201, 175))
   draw = ImageDraw.Draw(im)
   draw.ellipse((CENTER - RADIUS,) * 2 + (CENTER + RADIUS,) * 2,
-               fill=(0, 0, 255), outline=(0, 0, 0), width=4)
-  draw.ellipse((CENTER - 2,) * 2 + (CENTER + 2,) * 2, fill=(0, 0, 0))
+               fill=(0, 0, 255), outline=BLACK, width=4)
+  draw.ellipse((CENTER - 2,) * 2 + (CENTER + 2,) * 2, fill=BLACK)
   draw_text(draw, monster_speed, step, step_size, n_actions)
-  draw.ellipse(angle_to_rect(0), fill=(40, 200, 40))  # monster themself
+  draw.ellipse(angle_to_rect(0), fill=GREEN)  # monster themself
 
   for p, c in zip(positions, colors):
     draw.ellipse(coords_to_rect(p), fill=c)

@@ -117,6 +117,6 @@ def get_strongest_policies():
       print(k, v)
 
 
-get_strongest_policies()
-
-# plot_results()
+if __name__ == '__main__':
+  get_strongest_policies()
+  plot_results()

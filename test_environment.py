@@ -10,18 +10,15 @@ from tf_agents.policies.random_py_policy import RandomPyPolicy
 from tf_agents.policies.random_tf_policy import RandomTFPolicy
 from environment import LakeMonsterEnvironment
 from animate import episode_as_video
+from variations import JumpingEnvironment, MultiMonsterEnvironment
 
-
-TEST_VIDEO_FILENAME = 'test'
 
 # nice environment parameters for testing with random policy
 params = {'monster_speed': 0.7,
           'timeout_factor': 20,
           'step_size': 0.05,
           'n_actions': 20,
-          'use_mini_rewards': True,
-          'use_cartesian': True,
-          'use_noisy_start': True}
+          'use_mini_rewards': True}
 
 
 def validate_environment():
@@ -32,40 +29,40 @@ def validate_environment():
   print('Test successful.')
 
 
-def test_py_environment_with_random(num_episodes=1000):
+def test_py_environment_with_random(n_episodes=100):
   """Test py environment through random actions."""
-  print(f'Testing py environment with {num_episodes} episodes.')
+  print(f'Testing py environment over {n_episodes} episodes.')
   env = LakeMonsterEnvironment(**params)
 
   ts = env.reset()
   rewards = []
-  num_steps = []
+  n_steps = []
   results = {'capture': 0, 'timeout': 0, 'success': 0}
 
-  for _ in tqdm(range(num_episodes)):
+  for _ in tqdm(range(n_episodes)):
     while not ts.is_last():
       action = np.random.randint(0, params['n_actions'])
       ts = env.step(action)
 
     reward = ts.reward
     rewards.append(reward)
-    num_steps.append(env.num_steps)
+    n_steps.append(env.n_steps)
 
     _, result = env.determine_reward()
     results[result] += 1
     ts = env.reset()
 
-  assert sum(results.values()) == num_episodes
-  print(f'average num of steps per episode: {np.mean(num_steps):.3f}')
+  assert sum(results.values()) == n_episodes
+  print(f'average num of steps per episode: {np.mean(n_steps):.3f}')
   print(f'average reward per episode: {np.mean(rewards):.3f}')
-  print(f"proportion of captures: {results['capture'] / num_episodes}")
-  print(f"proportion of timeouts: {results['timeout'] / num_episodes}")
-  print(f"proportion of successes: {results['success'] / num_episodes}")
+  print(f"proportion of captures: {results['capture'] / n_episodes}")
+  print(f"proportion of timeouts: {results['timeout'] / n_episodes}")
+  print(f"proportion of successes: {results['success'] / n_episodes}")
 
 
-def test_tf_environment_with_random(num_episodes=100):
+def test_tf_environment_with_random(n_episodes=20):
   """Test tf environment through random actions."""
-  print(f'Testing tf environment with {num_episodes} episodes.')
+  print(f'Testing tf environment over {n_episodes} episodes.')
   print("You may see warnings related to TF's preferences for hardware.")
   env = LakeMonsterEnvironment(**params)
   env = TFPyEnvironment(env)
@@ -74,22 +71,22 @@ def test_tf_environment_with_random(num_episodes=100):
 
   ts = env.reset()
   rewards = []
-  num_steps = []
+  n_steps = []
 
-  for _ in tqdm(range(num_episodes)):
-    num_step = 0
+  for _ in tqdm(range(n_episodes)):
+    n_step = 0
     while not ts.is_last():
       action = policy.action(ts).action
       ts = env.step(action)
-      num_step += 1
+      n_step += 1
 
     reward = ts.reward
     rewards.append(reward)
-    num_steps.append(num_step)
+    n_steps.append(n_step)
     ts = env.reset()
 
   # print results
-  print('average num of steps per episode:', np.mean(num_steps))
+  print('average num of steps per episode:', np.mean(n_steps))
   print('average reward per episode', np.mean(rewards))
 
 
@@ -97,16 +94,16 @@ def test_video():
   """Run an episode and save video to file."""
   env = LakeMonsterEnvironment(**params)
   policy = RandomPyPolicy(time_step_spec=None, action_spec=env.action_spec())
-  episode_as_video(policy, params, filename=TEST_VIDEO_FILENAME)
+  episode_as_video(env, policy, filename='test')
 
 
 def test_movement():
   """Test handcrafted movements on fast monster."""
-  print('Creating vide of handcrafted strong monster.')
+  print('Creating video of handcrafted strong monster.')
 
   env = LakeMonsterEnvironment(3.5, 3.0, 0.1, 6)
   fps = 10
-  actions = [1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 3, 3, 2, 2, 4]
+  actions = [0, 0, 0, 0, 0, 5, 5, 5, 5, 5, 5, 5, 1, 3]
   path = 'videos/test-handcrafted.mp4'
   with imageio.get_writer(path, fps=fps) as video:
     time_step = env.reset()
@@ -119,6 +116,24 @@ def test_movement():
   print(f'Video created and saved as {path}')
 
 
+def test_jumping():
+  """Test jumping environment."""
+  print('Testing jumping environment.')
+  env = JumpingEnvironment(**params)
+  validate_py_environment(env, episodes=10)
+  policy = RandomPyPolicy(time_step_spec=None, action_spec=env.action_spec())
+  episode_as_video(env, policy, filename='test_jumping')
+
+
+def test_multi_monster():
+  """Test multi-monster environment."""
+  print('Testing multi-monster environment.')
+  env = MultiMonsterEnvironment(n_monsters=3, **params)
+  validate_py_environment(env, episodes=10)
+  policy = RandomPyPolicy(time_step_spec=None, action_spec=env.action_spec())
+  episode_as_video(env, policy, filename='test_multi')
+
+
 if __name__ == '__main__':
   print('\n' + '#' * 65)
   validate_environment()
@@ -129,5 +144,7 @@ if __name__ == '__main__':
   print('\n' + '#' * 65)
   test_video()
   test_movement()
+  test_jumping()
+  test_multi_monster()
   print('\n' + '#' * 65)
   print('All tests pass.')

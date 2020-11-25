@@ -65,9 +65,8 @@ def create_policy_gif(policy_path, asset_path, new_params=None):
   episode_as_gif(policy, env_params, asset_path, fps=10)
 
 
-def episode_as_video(policy, env_params, filename, fps=10):
+def episode_as_video(py_env, policy, filename, fps=10):
   """Create mp4 video through py_environment render method."""
-  py_env = LakeMonsterEnvironment(**env_params)
   tf_env = TFPyEnvironment(py_env)
 
   with imageio.get_writer('tmp.mp4', fps=fps) as video:

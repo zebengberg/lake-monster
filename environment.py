@@ -10,19 +10,16 @@ from render import renderer
 
 class LakeMonsterEnvironment(PyEnvironment):
   """A tf-agent environment for the lake monster problem. In this environment,
-  the monster remains fixed at the point (1, 0), and the player is confined to
-  swim inside of the unit disk. After an action takes place, the player is
-  rotated within the unit disk to simulate the monster traversing the lake
-  shore."""
+  the agent remains fixed on the positive x-axis. After each action taken by the
+  agent, both the agent and the monster are rotated so that the agent is
+  returned to the x-axis."""
 
   def __init__(self,
                monster_speed=1.0,
                timeout_factor=3,
                step_size=0.1,
-               n_actions=4,
-               use_mini_rewards=False,
-               use_cartesian=False,
-               use_noisy_start=False):
+               n_actions=8,
+               use_mini_rewards=True):
     super().__init__()
 
     self.monster_speed = monster_speed
@@ -30,8 +27,6 @@ class LakeMonsterEnvironment(PyEnvironment):
     self.step_size = step_size
     self.n_actions = n_actions
     self.use_mini_rewards = use_mini_rewards
-    self.use_cartesian = use_cartesian
-    self.use_noisy_start = use_noisy_start
 
     # total number of allowed steps
     self.duration = int(timeout_factor / step_size)
@@ -42,22 +37,22 @@ class LakeMonsterEnvironment(PyEnvironment):
                        np.sin(action * 2 * np.pi / n_actions)))
     self.action_to_direction = [to_vector(a) for a in range(n_actions)]
 
-    # building the rotation matrix
+    # monster movement
     self.monster_arc = self.step_size * self.monster_speed
-    c, s = np.cos(self.monster_arc), np.sin(self.monster_arc)
-    self.ccw_rot_matrix = np.array(((c, -s), (s, c)))
-    self.cw_rot_matrix = np.array(((c, s), (-s, c)))
 
+    # state variables
+    self.r = 0.0
+    self.monster_angle = 0.0
     self.n_steps = 0
-    self.position = self.get_start_position()
 
+    # for rewards
     self.highest_r_attained = 0.0
     self.is_monster_caught_up = False
 
-    # these variables are only used in render method
-    self.prev_monster_angle = 0.0
-    self.monster_angle = 0.0
-    self.prev_action_vector = None
+    # for rendering
+    self.total_agent_rotation = 0.0
+    self.total_monster_rotation = 0.0
+    self.action_vector = None
 
     self._action_spec = BoundedArraySpec(
         shape=(), dtype=np.int32, minimum=0, maximum=n_actions - 1,
@@ -67,47 +62,28 @@ class LakeMonsterEnvironment(PyEnvironment):
         name='observation')
     self._episode_ended = False
 
-  def get_start_position(self):
-    """Return the agent starting position."""
-    if self.use_noisy_start:
-      r = 0.2 * np.random.random()
-      theta = np.random.random()
-      x = r * np.cos(2 * np.pi * theta)
-      y = r * np.sin(2 * np.pi * theta)
-      return np.array((x, y), dtype=np.float32)
-    return np.array((0.0, 0.0), dtype=np.float32)
-
   def _reset(self):
     self._episode_ended = False
-    self.position = np.array((0.0, 0.0), dtype=np.float32)
+    self.r = 0.0
+    self.monster_angle = 0.0
     self.n_steps = 0
     self.highest_r_attained = 0.0
     self.is_monster_caught_up = False
-    self.monster_angle = 0.0
-    self.prev_action_vector = None
+    self.total_agent_rotation = 0.0
+    self.total_monster_rotation = 0.0
+    self.action_vector = None
     return time_step.restart(self._state)
 
   @property
   def _state(self):
-    state = (self.step_proportion, self.monster_speed, self.r, self.theta)
-    if self.use_cartesian:
-      state += tuple(self.position)
+    state = (self.step_size, self.monster_speed, self.step_proportion,
+             self.r, self.monster_angle)
     return np.array(state, dtype=np.float32)
-
-  @property
-  def r(self):
-    """Return the radius of the player."""
-    return np.linalg.norm(self.position)
 
   @property
   def step_proportion(self):
     """Return proportion of number of steps taken to number of steps allowed."""
     return self.n_steps / self.duration
-
-  @property
-  def theta(self):
-    """Return the angle of the player."""
-    return np.arctan2(self.position[1], self.position[0])
 
   def action_spec(self):
     return self._action_spec
@@ -117,53 +93,46 @@ class LakeMonsterEnvironment(PyEnvironment):
 
   def get_info(self):
     print('Not implemented')
-    return None
 
   def get_state(self):
     return self._state
 
   def set_state(self, state):
     print('Not implemented')
-    return None
 
-  def rotate(self):
-    """Update the position after action applied."""
-    self.prev_monster_angle = self.monster_angle
+  def rotate_monster(self, theta, monster_angle, total_rotation):
+    """Helper function for _step method."""
+    monster_angle -= theta
+    if monster_angle > np.pi:
+      monster_angle -= 2 * np.pi
+    elif monster_angle < -np.pi:
+      monster_angle += 2 * np.pi
 
-    # get agent off the x-axis to avoid boundary cases
-    self.position += np.array((0, 1e-6 * (np.random.random() - 0.5)))
-
-    y_sign = np.sign(self.position[1])
-    if abs(y_sign) != 1.0:
-      print('Agent position:', self.position)
-      raise ValueError('The agent is on the x-axis, and it should not be!')
-
-    if y_sign == 1.0:
-      rot_matrix = self.cw_rot_matrix
-    else:
-      rot_matrix = self.ccw_rot_matrix
-
-    rotated = np.dot(rot_matrix, self.position)
-    if np.sign(rotated[1]) != y_sign:  # we've rotated past the x-axis
-      self.monster_angle += np.arctan2(self.position[1], self.position[0])
-      rotated = np.array((self.r, 0.0))
+    s = np.sign(monster_angle)
+    monster_angle -= s * self.monster_arc
+    total_rotation -= s * self.monster_arc
+    if np.sign(monster_angle) != s:
+      total_rotation -= monster_angle
+      monster_angle = 0.0
       self.is_monster_caught_up = True
-    else:
-      self.monster_angle += y_sign * self.monster_arc
+    return monster_angle, total_rotation
 
-    self.position = rotated
+  def move_agent(self, action):
+    """Helper function for _step method."""
+    self.action_vector = self.step_size * self.action_to_direction[action]
+    position = np.array((self.r, 0)) + self.action_vector
+    self.r = np.linalg.norm(position)
+    theta = np.arctan2(position[1], position[0])
+    self.total_agent_rotation += theta
+    return theta
+
+  def conclude_step(self):
+    if self._episode_ended:
+      return self.reset()
+
     if not self.is_monster_caught_up:
       self.highest_r_attained = max(self.highest_r_attained, self.r)
 
-  def _step(self, action):
-    if self._episode_ended:
-      # previous action ended the episode so we ignore current action and reset
-      return self.reset()
-
-    action_vector = self.step_size * self.action_to_direction[action]
-    self.prev_action_vector = action_vector
-    self.position += action_vector
-    self.rotate()
     self.n_steps += 1
 
     # made it out of the lake
@@ -175,15 +144,22 @@ class LakeMonsterEnvironment(PyEnvironment):
     # still swimming
     return time_step.transition(self._state, reward=0)
 
+  def _step(self, action):
+
+    theta = self.move_agent(action)
+    self.monster_angle, self.total_monster_rotation = self.rotate_monster(
+        theta, self.monster_angle, self.total_monster_rotation)
+    return self.conclude_step()
+
   def determine_reward(self):
     """If the episode has ended, return the reward and result."""
     if not self._episode_ended:
       raise ValueError('Episode has not ended, but determine_reward is called')
 
     if self.r >= 1.0:
-      if round(self.position[1], 6) == 0.0 and self.position[0] > 0:
+      if self.monster_angle == 0.0:
         return int(self.use_mini_rewards) * self.highest_r_attained, 'capture'
-      return 1 + int(self.use_mini_rewards) * abs(self.theta), 'success'
+      return 1 + int(self.use_mini_rewards) * abs(self.monster_angle), 'success'
     # slightly worse penalty for timeout than capture
     return int(self.use_mini_rewards) * self.highest_r_attained - 0.1, 'timeout'
 
@@ -193,10 +169,10 @@ class LakeMonsterEnvironment(PyEnvironment):
     reward = None
     if self._episode_ended:
       reward, result = self.determine_reward()
-    params = {'monster_angle': self.monster_angle,
-              'prev_monster_angle': self.prev_monster_angle,
-              'position': self.position,
-              'prev_action_vector': self.prev_action_vector,
+    params = {'r': self.r,
+              'total_agent_rotation': self.total_agent_rotation,
+              'total_monster_rotation': self.total_monster_rotation,
+              'action_vector': self.action_vector,
               'result': result,
               'reward': reward,
               'step': self.n_steps,
@@ -204,6 +180,11 @@ class LakeMonsterEnvironment(PyEnvironment):
               'n_actions': self.n_actions,
               'step_size': self.step_size,
               'is_caught': self.is_monster_caught_up}
+
+    if isinstance(mode, list):
+      params['multi_monster_rotations'] = mode
+      im = renderer(**params)
+      return np.array(im)
 
     if mode == 'return_real':
       params['return_real'] = True

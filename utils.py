@@ -4,7 +4,6 @@ import os
 import random
 import json
 import glob
-import shutil
 import tensorflow as tf
 import pandas as pd
 
@@ -15,16 +14,14 @@ param_universe = {
     'initial_step_size': [0.4, 0.2, 0.1, 0.05],
     'initial_monster_speed': [2.5, 3.0, 3.5, 4.0],
     'timeout_factor': [1.5, 2.0, 2.5, 3.0],
-    'use_mini_rewards': [False, True],
-    'use_cartesian': [False, True],
-    'use_noisy_start': [False, True],
+    'use_mini_rewards': [True],
 
     # agent params
     'fc_layer_params': [(10, 10), (20, 20), (50, 50), (100, 100)],
     'dropout_layer_params': [None, (0.1, 0.1), (0.4, 0.4)],
     'learning_rate': [0.002, 0.001, 0.0005],
     'epsilon_greedy': [0.3, 0.1, 0.03],
-    'n_step_update': [1, 5, 10],
+    'n_step_update': [1, 2, 4, 8, 16],
     'use_categorical': [False, True],
     'use_step_schedule': [False, True],
     'use_mastery': [False, True],
