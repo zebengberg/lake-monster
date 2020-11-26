@@ -72,7 +72,8 @@ class Agent:
           n_step_update=10,
           use_categorical=False,
           use_step_schedule=True,
-          use_mastery=True):
+          use_mastery=True,
+          summative_callback=None):
 
     self.n_actions = n_actions
     self.initial_step_size = initial_step_size
@@ -87,17 +88,18 @@ class Agent:
     self.use_categorical = use_categorical
     self.use_step_schedule = use_step_schedule
     self.use_mastery = use_mastery
+    self.summative_callback = summative_callback
 
     # variable for determining learning target mastery
     self.learning_score = 0
     self.reward_sum = 0
 
     # summary writer for tensorboard
-    self.writer = tf.summary.create_file_writer('logs/')
+    self.uid = tf.Variable(uid, dtype=tf.string)
+    self.writer = tf.summary.create_file_writer('logs/' + self.get_uid())
     self.writer.set_as_default()
 
     # defining items which are tracked in checkpointer
-    self.uid = tf.Variable(uid, dtype=tf.string)
     self.monster_speed = tf.Variable(initial_monster_speed, dtype=tf.float64)
     self.step_size = tf.Variable(initial_step_size, dtype=tf.float64)
     if self.use_categorical:
@@ -113,6 +115,10 @@ class Agent:
     # defining other training items dependent on checkpointer parameters
     self.py_env, self.tf_env = self.build_env()
     self.driver, self.iterator = self.build_driver()
+
+  def get_uid(self):
+    """Return UID as string."""
+    return self.uid.numpy().decode()
 
   @property
   def env_params(self):
@@ -240,7 +246,7 @@ class Agent:
 
   def save_policy(self, step):
     """Save strong policy with tf-agent PolicySaver."""
-    print('Saving a strong policy.')
+    print('Saving agent policy.')
 
     # saving environment params as metadata in order to reconstruct environment
     metadata = py_to_tf(self.env_params)
@@ -307,14 +313,17 @@ class Agent:
   def run_summative(self, step):
     """Render a video of the agent, save a policy, and log results."""
     print('Creating video ...')
-    episode_as_video(self.agent.policy, self.env_params, f'episode-{step}')
+    episode_as_video(self.py_env, self.agent.policy, f'episode-{step}')
     print('Evaluating agent. You will see several lines of dots ...')
     result = probe_policy(self.agent.policy, self.env_params)
     result['n_episode'] = step
     print('Logging evaluation results ...')
     print(result)
-    log_results(self.uid.numpy().decode(), result)
+    log_results(self.get_uid(), result)
     self.save_policy(step)
+    if self.summative_callback is None:
+      return False
+    return self.summative_callback()
 
   def train_ad_infinitum(self):
     """Train the agent until interrupted by user."""
@@ -334,6 +343,7 @@ class Agent:
       if train_step % FORMATIVE_INTERVAL == 0:
         self.run_formative(train_step)
       if train_step % SUMMATIVE_INTERVAL == 0:
-        self.run_summative(train_step)
+        if self.run_summative(train_step):
+          break
       if train_step % SAVE_INTERVAL == 0:
         self.run_save(train_step)

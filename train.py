@@ -5,17 +5,18 @@ import os
 import shutil
 import uuid
 import webbrowser
+import datetime
 import tensorboard
 from agent import Agent
 from test_agent import test_agent, log_graph
 from utils import get_random_params, log_params, log_uid, read_params
 
 
-def launch_tb():
+def launch_tb(uid):
   """Launch tensorboard in a new browser tab."""
   print('Launching tensorboard. It will open shortly in a browser tab ...')
   tb = tensorboard.program.TensorBoard()
-  tb.configure(logdir='logs')
+  tb.configure(logdir='logs/' + uid)
   url = tb.launch()
   url += '#scalars&_smoothingWeight=0.95'
   webbrowser.open_new_tab(url)
@@ -28,7 +29,7 @@ def build_new_agent(use_random=False):
   uid = str(uuid.uuid1().int)
   if use_random:
     params = get_random_params()
-    print('Initializing new agent with parametes:')
+    print('Initializing new agent with parameters:')
     print(params)
     print('')
   else:  # using default agent parameters
@@ -59,26 +60,27 @@ def clear_knowledge():
     shutil.rmtree('videos/')
   if os.path.exists('checkpoints/'):
     shutil.rmtree('checkpoints/')
-  if os.path.exists('logs/'):
-    shutil.rmtree('logs/')
   if os.path.exists('agent_id.txt'):
     os.remove('agent_id.txt')
 
 
 def clear_all_knowledge():
   """Call clear_knowledge then remove policies and results."""
-  if input('You sure? Press `y` or `n` then hit enter. ') == 'y':
+  if input('Do you want to clear all knowledge and statistics? (y/n) ') == 'y':
     clear_knowledge()
     if os.path.exists('policies/'):
       shutil.rmtree('policies/')
     if os.path.exists('results.json'):
       os.remove('results.json')
+    if os.path.exists('logs/'):
+      shutil.rmtree('logs/')
 
 
 def confirm_new():
   """Ask the user to confirm initialization of new agent."""
   if os.path.exists('agent_id.txt'):
-    if input('Clear partially trained agent? Press `y` or `n` then hit enter. ') == 'y':
+    if input('Clear partially trained agent? (y/n) ') == 'y':
+      clear_knowledge()
       return True
     return False
   return True
@@ -87,17 +89,38 @@ def confirm_new():
 def generate_random():
   """Train new random agent."""
   if confirm_new():
-    launch_tb()
     a = build_new_agent(True)
+    launch_tb(a.get_uid())
     a.train_ad_infinitum()
 
 
 def generate_default():
   """Train new default agent."""
   if confirm_new():
-    launch_tb()
     a = build_new_agent(False)
+    launch_tb(a.get_uid())
     a.train_ad_infinitum()
+
+
+def run_many_trainings():
+  """Run a new training with random parameters every 24 hours."""
+  while True:
+    print('#' * 65)
+    print('Training new agent!')
+    print('#' * 65)
+    now = datetime.datetime.now()
+    duration = datetime.timedelta(hours=24)
+    end_time = now + duration
+
+    def callback():
+      now = datetime.datetime.now()
+      return now > end_time
+
+    a = build_new_agent(True)
+    launch_tb(a.get_uid())
+    a.summative_callback = callback
+    a.train_ad_infinitum()
+    clear_knowledge()
 
 
 def parse_args():
@@ -112,7 +135,8 @@ def parse_args():
     arg_dict = {'random': generate_random,
                 'default': generate_default,
                 'clear': clear_knowledge,
-                'clearall': clear_all_knowledge}
+                'clearall': clear_all_knowledge,
+                'many': run_many_trainings}
 
     if arg not in arg_dict:
       raise ValueError(
@@ -120,9 +144,10 @@ def parse_args():
     arg_dict[arg]()
 
   else:
-    launch_tb()
+
     if os.path.exists('agent_id.txt'):
       a = restore_existing_agent()
+      launch_tb(a.get_uid())
     else:
       a = build_new_agent()
     a.train_ad_infinitum()

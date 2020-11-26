@@ -111,7 +111,7 @@ class LakeMonsterEnvironment(PyEnvironment):
     s = np.sign(monster_angle)
     monster_angle -= s * self.monster_arc
     total_rotation -= s * self.monster_arc
-    if np.sign(monster_angle) != s:
+    if np.sign(monster_angle) != s or s == 0.0:
       total_rotation -= monster_angle
       monster_angle = 0.0
       self.is_monster_caught_up = True

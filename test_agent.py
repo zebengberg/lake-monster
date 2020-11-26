@@ -39,7 +39,7 @@ def log_graph(uid, params=None, write_logs=True):
 
   x = a.tf_env.reset().observation  # input to model.__call__
   if write_logs:
-    summary_writer = tf.summary.create_file_writer('logs/')
+    summary_writer = tf.summary.create_file_writer('logs/' + uid)
     summary_writer.set_as_default()
     tf.summary.trace_on()
     model(x)  # ignoring output

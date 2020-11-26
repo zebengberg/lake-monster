@@ -11,20 +11,20 @@ import pandas as pd
 param_universe = {
     # environment params
     'n_actions': [4, 8, 16, 32],
-    'initial_step_size': [0.4, 0.2, 0.1, 0.05],
-    'initial_monster_speed': [2.5, 3.0, 3.5, 4.0],
+    'initial_step_size': [0.2, 0.1, 0.05],
+    'initial_monster_speed': [3.0, 3.4, 3.7, 4.0],
     'timeout_factor': [1.5, 2.0, 2.5, 3.0],
     'use_mini_rewards': [True],
 
     # agent params
     'fc_layer_params': [(10, 10), (20, 20), (50, 50), (100, 100)],
-    'dropout_layer_params': [None, (0.1, 0.1), (0.4, 0.4)],
+    'dropout_layer_params': [None, (0.1, 0.1), (0.3, 0.3), (0.5, 0.5)],
     'learning_rate': [0.002, 0.001, 0.0005],
     'epsilon_greedy': [0.3, 0.1, 0.03],
     'n_step_update': [1, 2, 4, 8, 16],
     'use_categorical': [False, True],
     'use_step_schedule': [False, True],
-    'use_mastery': [False, True],
+    'use_mastery': [True],
 }
 
 
