@@ -5,11 +5,16 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from tf_agents.environments.tf_py_environment import TFPyEnvironment
 from environment import LakeMonsterEnvironment
+from variations import MultiMonsterEnvironment
 
 
 def evaluate_episode(policy, env_params):
   """Use naive while loop to evaluate policy in single episode."""
-  py_env = LakeMonsterEnvironment(**env_params)
+  if 'n_monsters' in env_params:
+    env = MultiMonsterEnvironment
+  else:
+    env = LakeMonsterEnvironment
+  py_env = env(**env_params)
   tf_env = TFPyEnvironment(py_env)
   ts = tf_env.reset()
   n_steps = 0

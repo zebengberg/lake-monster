@@ -14,6 +14,7 @@ from tf_agents.replay_buffers.tf_uniform_replay_buffer import TFUniformReplayBuf
 from tf_agents.drivers.dynamic_episode_driver import DynamicEpisodeDriver
 from tf_agents.policies.policy_saver import PolicySaver
 from environment import LakeMonsterEnvironment
+from variations import MultiMonsterEnvironment
 from animate import episode_as_video
 from evaluate import evaluate_episode, probe_policy
 from utils import log_results, py_to_tf
@@ -136,19 +137,18 @@ class Agent:
 
   def build_dqn_agent(self):
     """Build DQN agent with QNetwork."""
-    py_temp_env = LakeMonsterEnvironment(n_actions=self.n_actions)
-    tf_temp_env = TFPyEnvironment(py_temp_env)
+    temp_env = self.build_temp_env()
 
     q_net = q_network.QNetwork(
-        tf_temp_env.observation_spec(),
-        tf_temp_env.action_spec(),
+        temp_env.observation_spec(),
+        temp_env.action_spec(),
         fc_layer_params=self.fc_layer_params,
         dropout_layer_params=self.dropout_layer_params)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
     agent = DqnAgent(
-        tf_temp_env.time_step_spec(),
-        tf_temp_env.action_spec(),
+        temp_env.time_step_spec(),
+        temp_env.action_spec(),
         n_step_update=self.n_step_update,
         q_network=q_net,
         optimizer=optimizer,
@@ -160,21 +160,20 @@ class Agent:
 
   def build_categorical_dqn_agent(self):
     """Build categorical DQN agent with CategoricalQNetwork."""
-    py_temp_env = LakeMonsterEnvironment(n_actions=self.n_actions)
-    tf_temp_env = TFPyEnvironment(py_temp_env)
+    temp_env = self.build_temp_env()
 
     if self.dropout_layer_params is not None:
       raise AttributeError('CategoricalQNetwork does accept dropout layers.')
 
     q_net = categorical_q_network.CategoricalQNetwork(
-        tf_temp_env.observation_spec(),
-        tf_temp_env.action_spec(),
+        temp_env.observation_spec(),
+        temp_env.action_spec(),
         fc_layer_params=self.fc_layer_params)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
     agent = CategoricalDqnAgent(
-        tf_temp_env.time_step_spec(),
-        tf_temp_env.action_spec(),
+        temp_env.time_step_spec(),
+        temp_env.action_spec(),
         n_step_update=self.n_step_update,
         categorical_q_network=q_net,
         optimizer=optimizer,
@@ -206,6 +205,11 @@ class Agent:
         uid=self.uid,
         monster_speed=self.monster_speed,
         step_size=self.step_size)
+
+  def build_temp_env(self):
+    """Helper function for build_dqn_agent."""
+    temp_env = LakeMonsterEnvironment(n_actions=self.n_actions)
+    return TFPyEnvironment(temp_env)
 
   def build_env(self):
     """Build training and evaluation environments."""
@@ -347,3 +351,31 @@ class Agent:
           break
       if train_step % SAVE_INTERVAL == 0:
         self.run_save(train_step)
+
+
+class MultiMonsterAgent(Agent):
+  """A DQN agent for the MultiMonsterEnvironment."""
+
+  def __init__(self, n_monsters, **kwargs):
+    self.n_monsters = n_monsters
+    super().__init__(**kwargs)
+
+  @property
+  def env_params(self):
+    """Override from Agent."""
+    params = super().env_params
+    params['n_monsters'] = self.n_monsters
+    return params
+
+  def build_temp_env(self):
+    """Override from Agent."""
+    temp_env = MultiMonsterEnvironment(n_actions=self.n_actions,
+                                       n_monsters=self.n_monsters)
+    return TFPyEnvironment(temp_env)
+
+  def build_env(self):
+    """Override from Agent."""
+    params = self.env_params
+    py_env = MultiMonsterEnvironment(**params)
+    tf_env = TFPyEnvironment(py_env)
+    return py_env, tf_env

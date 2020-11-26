@@ -1,4 +1,4 @@
-"""A script for training the agent."""
+"""A module for training the agent."""
 
 import sys
 import os
@@ -7,7 +7,7 @@ import uuid
 import webbrowser
 import datetime
 import tensorboard
-from agent import Agent
+from agent import Agent, MultiMonsterAgent
 from test_agent import test_agent, log_graph
 from utils import get_random_params, log_params, log_uid, read_params
 
@@ -102,6 +102,23 @@ def generate_default():
     a.train_ad_infinitum()
 
 
+def generate_multi():
+  """Train MultiMonsterAgent."""
+  if confirm_new():
+    uid = str(uuid.uuid1().int)
+    params = {
+        'n_monsters': 6,
+        'n_actions': 8,
+        'initial_monster_speed': 2.0,
+        'timeout_factor': 2.0}
+
+    log_uid(uid)
+    log_params(uid, params)
+    a = MultiMonsterAgent(uid=uid, **params)
+    launch_tb(a.get_uid())
+    a.train_ad_infinitum()
+
+
 def run_many_trainings():
   """Run a new training with random parameters every 24 hours."""
   while True:
@@ -136,15 +153,14 @@ def parse_args():
                 'default': generate_default,
                 'clear': clear_knowledge,
                 'clearall': clear_all_knowledge,
-                'many': run_many_trainings}
+                'many': run_many_trainings,
+                'multi': generate_multi}
 
     if arg not in arg_dict:
-      raise ValueError(
-          f"Expecting an argument from: {', '.join(arg_dict.keys())}")
+      raise ValueError(f"Expecting arg from: {', '.join(arg_dict.keys())}")
     arg_dict[arg]()
 
   else:
-
     if os.path.exists('agent_id.txt'):
       a = restore_existing_agent()
       launch_tb(a.get_uid())

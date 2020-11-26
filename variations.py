@@ -1,12 +1,11 @@
 """Define classes derived from LakeMonsterEnvironment."""
 
-
-from environment import LakeMonsterEnvironment
 import numpy as np
+from environment import LakeMonsterEnvironment
 
 
 class JumpingEnvironment(LakeMonsterEnvironment):
-  """A LakeMonsterEnvironent in which the monster randomly teleports once per episode."""
+  """A LakeMonsterEnvironment in which the monster randomly teleports once per episode."""
 
   def __init__(self, **kwargs):
     super().__init__(**kwargs)
