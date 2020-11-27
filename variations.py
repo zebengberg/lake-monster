@@ -54,6 +54,11 @@ class MultiMonsterEnvironment(LakeMonsterEnvironment):
     for i in range(self.n_monsters):
       self.monster_angles[i], self.total_monster_rotations[i] = self.rotate_monster(
           theta, self.monster_angles[i], self.total_monster_rotations[i])
+    if self.r < 0.5:  # tweaking the mini-reward scoring
+      self.is_monster_caught_up = False
+
+    # needed for determine_reward
+    self.monster_angle = min(abs(a) for a in self.monster_angles)
     return self.conclude_step()
 
   def render(self, mode='rgb_array'):

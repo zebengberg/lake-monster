@@ -127,6 +127,7 @@ class LakeMonsterEnvironment(PyEnvironment):
     return theta
 
   def conclude_step(self):
+    """Helper function for _step method."""
     if self._episode_ended:
       return self.reset()
 
@@ -145,7 +146,6 @@ class LakeMonsterEnvironment(PyEnvironment):
     return time_step.transition(self._state, reward=0)
 
   def _step(self, action):
-
     theta = self.move_agent(action)
     self.monster_angle, self.total_monster_rotation = self.rotate_monster(
         theta, self.monster_angle, self.total_monster_rotation)
