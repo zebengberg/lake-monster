@@ -97,31 +97,64 @@ def result_df():
   return pd.concat(dfs, axis=1), params
 
 
-def plot_results():
+def plot_results(policies=None):
   """Plot evaluation monter speeds over training."""
   df, _ = result_df()
-  df = df[df.index <= 500_000]
-  df = df.rolling(50).mean()
-  df.plot(legend=False)
-  plt.ylabel('monster_speed')
-  plt.title('evaluation scores over training')
+  if policies:
+    df = df[policies]
+  df = df[df.index <= 600_000]
+  df = df.rolling(25).mean()
+  plt.figure(figsize=(12, 8))
+  df.plot(legend=True, ax=plt.gca())
+  plt.xlabel('episode number')
+  plt.ylabel('monster speed')
+  plt.title('Smoothed evaluation scores over training')
+  plt.legend(loc='lower right', fontsize='xx-small')
+  plt.grid()
+  plt.savefig('assets/results.png', dpi=300)
   plt.show()
 
 
-def get_strongest_policies():
-  """Search the results for policies with high maximum evaluation."""
+def print_strongest_policies():
+  """Print a markdown table showing agent parameters and evaluation results."""
 
-  threshold = 4.0
   df, params = result_df()
-  strong = df.max() > threshold
-  policies = list(strong[strong].index)
-  for p in policies:
-    print('#' * 65)
-    print('max monster_speed:', df[p].max())
-    for k, v in params[p].items():
-      print(k, v)
+
+  shortened_names = {
+      'n_actions': 'n act',
+      'initial_step_size': 'init step',
+      'initial_monster_speed': 'init speed',
+      'timeout_factor': 'timeout',
+      'fc_layer_params': 'layers',
+      'dropout_layer_params': 'dropout',
+      'learning_rate': 'learn rate',
+      'epsilon_greedy': 'epsilon',
+      'n_step_update': 'update',
+      'use_categorical': 'categorical',
+      'use_step_schedule': 'schedule'
+  }
+
+  params_df = []
+  for p in df.columns:
+    results = {}
+    results['max speed'] = round(df[p].max(), 3)
+    results['avg speed'] = round(df[p].mean(), 3)
+    for k, v in shortened_names.items():
+      results[v] = params[p][k]
+
+    if results['categorical']:
+      results['dropout'] = 'None'
+    if results['dropout'] is None:  # getting None to appear in markdown
+      results['dropout'] = 'None'
+
+    params_df.append(results)
+
+  params_df = pd.DataFrame(params_df)
+  params_df = params_df.sort_values(by='max speed', axis=0, ascending=False)
+
+  print(params_df.to_markdown(index=False))
 
 
 if __name__ == '__main__':
-  get_strongest_policies()
+  print_strongest_policies()
   plot_results()

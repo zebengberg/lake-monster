@@ -7,10 +7,5 @@ checkpoints/
 videos/
 logs/
 policies/
-results.json
+*.json
 agent_id.txt
-
-# pyinstaller stuff
-*.spec
-build/
-dist/

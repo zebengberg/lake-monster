@@ -87,24 +87,33 @@ def log_results(uid, results):
   os.remove('backup.json')
 
 
-def merge_results(new_results_path):
+def merge_results(new_results_path, existing_results_path=None):
   """Merge results collected elsewhere."""
+  if existing_results_path is None:
+    existing_results_path = 'results.json'
+
   with open(new_results_path) as f:
     new_data = json.load(f)
 
-  with open('results.json') as f:
+  if not os.path.exists(existing_results_path):
+    with open(existing_results_path, 'w') as f:
+      json.dump({}, f)
+  with open(existing_results_path) as f:
     data = json.load(f)
 
   for k, v in new_data.items():
     if k in data:
-      print('Redundant UUID:', k)
-      print('Skipping this merge.')
+      print('Found redundant UUID:', k)
+      if input('Update results with this redundant UUID? (y/n') == 'y':
+        data[k] = v
+      else:
+        print('Skipping this update.')
     else:
       data[k] = v
 
   # making a backup copy first
-  os.rename('results.json', 'backup.json')
-  with open('results.json', 'w') as f:
+  os.rename(existing_results_path, 'backup.json')
+  with open(existing_results_path, 'w') as f:
     json.dump(data, f, indent=2)
   # remove backup copy
   os.remove('backup.json')

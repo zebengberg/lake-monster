@@ -55,7 +55,7 @@ def restore_existing_agent():
 
 
 def clear_knowledge():
-  """Remove knowledge saved during last agent train."""
+  """Remove videos and checkpoints saved during last trained agent."""
   if os.path.exists('videos/'):
     shutil.rmtree('videos/')
   if os.path.exists('checkpoints/'):
@@ -65,7 +65,7 @@ def clear_knowledge():
 
 
 def clear_all_knowledge():
-  """Call clear_knowledge then remove policies and results."""
+  """Clear all saved policies, results, logs, videos, and checkpoints."""
   if input('Do you want to clear all knowledge and statistics? (y/n) ') == 'y':
     clear_knowledge()
     if os.path.exists('policies/'):
@@ -87,7 +87,7 @@ def confirm_new():
 
 
 def generate_random():
-  """Train new random agent."""
+  """Train a new agent with random parameters."""
   if confirm_new():
     a = build_new_agent(True)
     launch_tb(a.get_uid())
@@ -95,7 +95,7 @@ def generate_random():
 
 
 def generate_default():
-  """Train new default agent."""
+  """Train a new agent with default parameters."""
   if confirm_new():
     a = build_new_agent(False)
     launch_tb(a.get_uid())
@@ -103,7 +103,7 @@ def generate_default():
 
 
 def generate_multi():
-  """Train MultiMonsterAgent."""
+  """Train a MultiMonsterAgent with preset parameters."""
   if confirm_new():
     uid = str(uuid.uuid1().int)
     params = {
@@ -120,7 +120,7 @@ def generate_multi():
 
 
 def run_many_trainings():
-  """Run a new training with random parameters every 24 hours."""
+  """Train a new agent with random parameters every 24 hours."""
   while True:
     print('#' * 65)
     print('Training new agent!')
@@ -140,6 +140,18 @@ def run_many_trainings():
     clear_knowledge()
 
 
+def print_help():
+  """Print this help message."""
+  t = ' ' * 4
+  print('Usage: python train.py [arg]')
+  print('Train an RL agent to solve the lake monster problem.')
+  print(t + 'The optional argument [arg] could be one of:')
+
+  for arg, f in ARG_DICT.items():
+    l = t + '--' + f'{arg: <10}' + t + f.__doc__
+    print(l)
+
+
 def parse_args():
   """Parse command line arguments."""
 
@@ -149,18 +161,13 @@ def parse_args():
 
   if len(args) == 2:
     arg = args[1]
-    arg_dict = {'random': generate_random,
-                'default': generate_default,
-                'clear': clear_knowledge,
-                'clearall': clear_all_knowledge,
-                'many': run_many_trainings,
-                'multi': generate_multi}
+    args = arg.lstrip('-')
 
-    if arg not in arg_dict:
-      raise ValueError(f"Expecting arg from: {', '.join(arg_dict.keys())}")
-    arg_dict[arg]()
+    if arg not in ARG_DICT:
+      raise ValueError(f"Expecting arg from: {', '.join(ARG_DICT.keys())}")
+    ARG_DICT[arg]()
 
-  else:
+  elif len(args) == 1:
     if os.path.exists('agent_id.txt'):
       a = restore_existing_agent()
       launch_tb(a.get_uid())
@@ -168,6 +175,17 @@ def parse_args():
       a = build_new_agent()
     a.train_ad_infinitum()
 
+  else:
+    raise ValueError('Expecting at most one argument. Try passing --help.')
+
+
+ARG_DICT = {'default': generate_default,
+            'random': generate_random,
+            'many': run_many_trainings,
+            'multi': generate_multi,
+            'clear': clear_knowledge,
+            'clearall': clear_all_knowledge,
+            'help': print_help}
 
 if __name__ == '__main__':
   parse_args()
