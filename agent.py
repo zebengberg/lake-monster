@@ -14,7 +14,7 @@ from tf_agents.replay_buffers.tf_uniform_replay_buffer import TFUniformReplayBuf
 from tf_agents.drivers.dynamic_episode_driver import DynamicEpisodeDriver
 from tf_agents.policies.policy_saver import PolicySaver
 from environment import LakeMonsterEnvironment
-from variations import MultiMonsterEnvironment
+from variations import MultiMonsterEnvironment, JumpingEnvironment
 from animate import episode_as_video
 from evaluate import evaluate_episode, probe_policy
 from utils import log_results, py_to_tf
@@ -64,14 +64,14 @@ class Agent:
           n_actions=16,
           initial_step_size=0.1,
           initial_monster_speed=4.0,
-          timeout_factor=3.0,
+          timeout_factor=2.0,
           use_mini_rewards=True,
           fc_layer_params=(100, 100),
           dropout_layer_params=None,
-          learning_rate=0.0005,
-          epsilon_greedy=0.03,
-          n_step_update=10,
-          use_categorical=False,
+          learning_rate=0.001,
+          epsilon_greedy=0.1,
+          n_step_update=6,
+          use_categorical=True,
           use_step_schedule=True,
           use_mastery=True,
           summative_callback=None):
@@ -356,9 +356,9 @@ class Agent:
 class MultiMonsterAgent(Agent):
   """A DQN agent for the MultiMonsterEnvironment."""
 
-  def __init__(self, n_monsters, **kwargs):
+  def __init__(self, uid, n_monsters, **kwargs):
     self.n_monsters = n_monsters
-    super().__init__(**kwargs)
+    super().__init__(uid, **kwargs)
 
   @property
   def env_params(self):
@@ -377,5 +377,31 @@ class MultiMonsterAgent(Agent):
     """Override from Agent."""
     params = self.env_params
     py_env = MultiMonsterEnvironment(**params)
+    tf_env = TFPyEnvironment(py_env)
+    return py_env, tf_env
+
+
+class JumpingAgent(Agent):
+  """A DQN agent for the JumpingEnvironment."""
+
+  def __init__(self, uid, **kwargs):
+    super().__init__(uid, **kwargs)
+
+  @property
+  def env_params(self):
+    """Override from Agent."""
+    params = super().env_params
+    params['is_jumping'] = True
+    return params
+
+  def build_temp_env(self):
+    """Override from Agent."""
+    temp_env = JumpingEnvironment(n_actions=self.n_actions)
+    return TFPyEnvironment(temp_env)
+
+  def build_env(self):
+    """Override from Agent."""
+    params = self.env_params
+    py_env = JumpingEnvironment(**params)
     tf_env = TFPyEnvironment(py_env)
     return py_env, tf_env

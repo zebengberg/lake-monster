@@ -5,13 +5,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from tf_agents.environments.tf_py_environment import TFPyEnvironment
 from environment import LakeMonsterEnvironment
-from variations import MultiMonsterEnvironment
+from variations import MultiMonsterEnvironment, JumpingEnvironment
 
 
 def evaluate_episode(policy, env_params):
   """Use naive while loop to evaluate policy in single episode."""
   if 'n_monsters' in env_params:
     env = MultiMonsterEnvironment
+  elif 'is_jumping' in env_params:
+    env = JumpingEnvironment
   else:
     env = LakeMonsterEnvironment
   py_env = env(**env_params)
@@ -105,11 +107,11 @@ def plot_results(policies=None):
   df = df[df.index <= 600_000]
   df = df.rolling(25).mean()
   plt.figure(figsize=(12, 8))
-  df.plot(legend=True, ax=plt.gca())
+  df.plot(legend=False, ax=plt.gca())
   plt.xlabel('episode number')
   plt.ylabel('monster speed')
   plt.title('Smoothed evaluation scores over training')
-  plt.legend(loc='lower right', fontsize='xx-small')
+  # plt.legend(loc='lower right', fontsize='xx-small')
   plt.grid()
   plt.savefig('assets/results.png', dpi=300)
   plt.show()
@@ -136,8 +138,14 @@ def print_strongest_policies():
 
   params_df = []
   for p in df.columns:
+    # printing out high speed policies separately from markdown
+    episode = df[p].idxmax()
+    speed = df[p][episode]
+    if speed > 4.2:
+      print(p + '-' + str(episode))
+
     results = {}
-    results['max speed'] = round(df[p].max(), 3)
+    results['max speed'] = round(speed, 3)
     results['avg speed'] = round(df[p].mean(), 3)
     for k, v in shortened_names.items():
       results[v] = params[p][k]

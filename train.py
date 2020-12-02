@@ -7,7 +7,7 @@ import uuid
 import webbrowser
 import datetime
 import tensorboard
-from agent import Agent, MultiMonsterAgent
+from agent import Agent, MultiMonsterAgent, JumpingAgent
 from test_agent import test_agent, log_graph
 from utils import get_random_params, log_params, log_uid, read_params
 
@@ -119,6 +119,21 @@ def generate_multi():
     a.train_ad_infinitum()
 
 
+def generate_jump():
+  """Train a JumpingAgent with default LakeMonster parameters."""
+  if confirm_new():
+    uid = str(uuid.uuid1().int)
+    print('Initializing new JumpingAgent with default parameters.\n')
+
+    test_agent(uid, params)
+    log_graph(uid, params)
+    log_uid(uid)
+    log_params(uid, params)
+    a = JumpingAgent(uid, **params)
+    launch_tb(a.get_uid())
+    a.train_ad_infinitum()
+
+
 def run_many_trainings():
   """Train a new agent with random parameters every 24 hours."""
   while True:
@@ -183,6 +198,7 @@ ARG_DICT = {'default': generate_default,
             'random': generate_random,
             'many': run_many_trainings,
             'multi': generate_multi,
+            'jump': generate_jump,
             'clear': clear_knowledge,
             'clearall': clear_all_knowledge,
             'help': print_help}

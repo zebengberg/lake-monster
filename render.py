@@ -13,12 +13,12 @@ BLACK = (0,) * 3
 GREEN = (40, 200, 40)
 
 
-def coords_to_rect(coords):
+def coords_to_rect(coords, radius=8):
   """Convert environment coordinates to PIL rectangle coordinates."""
   x, y = coords
   y *= -1
   x, y = CENTER + RADIUS * x, CENTER + RADIUS * y
-  return x - 8, y - 8, x + 8, y + 8
+  return x - radius, y - radius, x + radius, y + radius
 
 
 def angle_to_rect(angle):
@@ -69,6 +69,7 @@ def draw_text(draw, monster_speed, step, step_size, n_actions, r=None):
 
 
 def renderer(r,
+             prev_agent_rotation,
              total_agent_rotation,
              total_monster_rotation,
              action_vector,
@@ -108,9 +109,11 @@ def renderer(r,
     else:
       color = (255, 255, 0)
 
-    real_vector = np.dot(agent_rot_matrix, action_vector)
-    unit_vector = real_vector / np.linalg.norm(real_vector)
-    lines = arrow_segments(unit_vector)
+    c, s = np.cos(prev_agent_rotation), np.sin(prev_agent_rotation)
+    agent_rot_matrix = np.array(((c, -s), (s, c)))
+    action_vector = np.dot(agent_rot_matrix, action_vector)
+    action_vector = action_vector / np.linalg.norm(action_vector)
+    lines = arrow_segments(action_vector)
     for line in lines:
       draw.line(line, fill=color, width=4)
 
@@ -146,5 +149,5 @@ def render_many_agents(positions, colors, step, step_size, n_actions, monster_sp
   draw.ellipse(angle_to_rect(0), fill=GREEN)  # monster themself
 
   for p, c in zip(positions, colors):
-    draw.ellipse(coords_to_rect(p), fill=c)
+    draw.ellipse(coords_to_rect(p, 2), fill=c)
   return im

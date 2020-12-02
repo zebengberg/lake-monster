@@ -8,14 +8,20 @@ class JumpingEnvironment(LakeMonsterEnvironment):
   """A LakeMonsterEnvironment in which the monster randomly teleports once per episode."""
 
   def __init__(self, **kwargs):
-    super().__init__(**kwargs)
     self.jump_at_r = np.random.random()
     self.has_jumped = False
+    super().__init__(**kwargs)
 
   def _reset(self):
     self.jump_at_r = np.random.random()
     self.has_jumped = False
     return super()._reset()
+
+  @property
+  def _state(self):
+    state = list(super()._state)
+    state += [int(self.has_jumped)]
+    return np.array(state, dtype=np.float32)
 
   def _step(self, action):
     if not self.has_jumped and self.r > self.jump_at_r:

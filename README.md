@@ -58,6 +58,7 @@ Train an RL agent to solve the lake monster problem.
     --random        Train a new agent with random parameters.
     --many          Train a new agent with random parameters every 24 hours.
     --multi         Train a MultiMonsterAgent with preset parameters.
+    --jump          Train a JumpingAgent with default LakeMonster parameters.
     --clear         Remove videos and checkpoints saved during last trained agent.
     --clearall      Clear all saved policies, results, logs, videos, and checkpoints.
     --help          Print this help message.
@@ -170,7 +171,7 @@ The [optimal mathematical solution](http://datagenetics.com/blog/october12013/in
 
 ### Evaluation
 
-During training, agents are occasionally evaluated using the [evaluation](evaluation.py) module.
+Periodically throughout training, agents are evaluated using the [evaluation](evaluation.py) module. Agent policies are placed in a series of different environments in which the `monster_speed` and `step_size` parameters are dynamically updated depending on the agent's performance. In this way, an agent can be probed to determine the maximum monster speed at which it can escape. The best result from these evaluations are logged in the `results.json` file.
 
 ### Random parameters
 
@@ -183,24 +184,34 @@ A number of agents were trained for several hundred thousand episodes by running
 |     4.452 |     2.958 |    32 |       0.1 |          4 |       2 | [10, 10]   | None       |     0.0005 |    0.03 |      8 | True        | True     |
 |     4.416 |     2.985 |    16 |       0.2 |        3.7 |     2.5 | [20, 20]   | None       |      0.002 |     0.3 |      4 | True        | True     |
 |     4.374 |     3.264 |    16 |       0.2 |          4 |       3 | [100, 100] | [0.3, 0.3] |      0.002 |     0.3 |      4 | False       | False    |
+|     4.354 |     3.426 |    16 |       0.2 |        3.7 |       3 | [20, 20]   | None       |      0.002 |    0.03 |      4 | False       | False    |
+|     4.348 |     3.621 |     8 |       0.2 |        3.7 |     2.5 | [100, 100] | [0.1, 0.1] |      0.002 |     0.1 |      4 | False       | True     |
+|     4.345 |     3.892 |     8 |       0.1 |          3 |       2 | [50, 50]   | None       |      0.001 |     0.3 |      8 | True        | True     |
 |     4.271 |     1.908 |    32 |      0.05 |        3.7 |       3 | [100, 100] | [0.5, 0.5] |      0.002 |     0.1 |      4 | False       | True     |
-|     4.258 |     3.202 |    16 |       0.2 |        3.7 |       3 | [20, 20]   | None       |      0.002 |    0.03 |      4 | False       | False    |
 |     4.235 |     2.826 |     8 |       0.2 |        3.7 |       3 | [100, 100] | None       |      0.002 |     0.3 |     16 | True        | False    |
-|     4.213 |     0.397 |    32 |      0.05 |          4 |     1.5 | [100, 100] | None       |      0.002 |     0.1 |      2 | True        | True     |
+|     4.213 |     0.979 |    32 |      0.05 |          4 |     1.5 | [100, 100] | None       |      0.002 |     0.1 |      2 | True        | True     |
 |     4.212 |     2.623 |    32 |      0.05 |          4 |       2 | [10, 10]   | [0.1, 0.1] |      0.001 |    0.03 |      2 | False       | False    |
 |     4.195 |     3.275 |     8 |       0.2 |          3 |     2.5 | [100, 100] | None       |      0.002 |     0.3 |      1 | True        | False    |
+|     4.172 |      2.18 |    32 |       0.1 |        3.7 |     2.5 | [10, 10]   | None       |      0.002 |     0.3 |      1 | False       | True     |
 |     4.161 |     3.401 |    32 |       0.2 |          3 |     2.5 | [50, 50]   | [0.5, 0.5] |      0.001 |     0.3 |      2 | False       | False    |
+|     4.051 |     1.909 |    16 |       0.1 |          4 |       2 | [100, 100] | [0.5, 0.5] |     0.0005 |    0.03 |      1 | False       | False    |
 |     4.045 |      2.02 |    16 |      0.05 |        3.7 |       3 | [50, 50]   | None       |      0.001 |    0.03 |      2 | False       | False    |
 |     4.029 |     1.206 |     8 |      0.05 |        3.4 |     2.5 | [10, 10]   | [0.3, 0.3] |     0.0005 |     0.1 |      1 | False       | False    |
-|     4.019 |     2.206 |     4 |      0.05 |        3.7 |     2.5 | [100, 100] | None       |      0.002 |    0.03 |     16 | True        | False    |
+|     4.026 |     1.581 |    32 |       0.1 |        3.7 |     1.5 | [100, 100] | None       |      0.002 |     0.1 |      1 | False       | True     |
+|     4.019 |     3.019 |     4 |      0.05 |        3.7 |     2.5 | [100, 100] | None       |      0.002 |    0.03 |     16 | True        | False    |
+|     4.006 |     0.601 |    32 |       0.2 |        3.4 |     1.5 | [100, 100] | [0.1, 0.1] |      0.001 |    0.03 |      2 | False       | False    |
 |     3.999 |     0.853 |     4 |      0.05 |          3 |       2 | [50, 50]   | None       |      0.001 |    0.03 |      1 | True        | True     |
 |      3.98 |     3.395 |     4 |       0.2 |        3.7 |       3 | [100, 100] | None       |      0.002 |    0.03 |     16 | True        | True     |
 |     3.951 |     1.063 |     8 |      0.05 |          4 |     2.5 | [10, 10]   | None       |      0.001 |    0.03 |      2 | True        | False    |
-|     3.668 |     1.379 |    16 |       0.1 |          4 |       2 | [100, 100] | [0.5, 0.5] |     0.0005 |    0.03 |      1 | False       | False    |
+|     3.939 |     2.079 |     4 |       0.2 |          3 |       3 | [100, 100] | None       |     0.0005 |    0.03 |      4 | False       | False    |
+|     3.926 |     3.724 |     4 |       0.1 |          3 |     2.5 | [100, 100] | None       |      0.002 |     0.1 |      8 | True        | True     |
+|     3.896 |     2.136 |     4 |       0.1 |        3.7 |     1.5 | [20, 20]   | None       |     0.0005 |    0.03 |      2 | False       | False    |
+|     3.795 |     2.552 |    32 |      0.05 |          4 |       3 | [50, 50]   | [0.5, 0.5] |      0.001 |     0.3 |      8 | False       | True     |
 |      3.57 |     3.187 |     4 |       0.2 |        3.4 |     1.5 | [50, 50]   | None       |      0.001 |     0.1 |      2 | True        | False    |
 |     3.169 |     0.727 |    16 |       0.1 |        3.7 |     2.5 | [50, 50]   | None       |      0.002 |    0.03 |      1 | True        | True     |
 |     2.187 |     0.022 |    32 |      0.05 |          4 |     2.5 | [100, 100] | None       |     0.0005 |     0.1 |      4 | True        | True     |
 |     1.712 |     0.295 |     4 |       0.1 |        3.4 |       3 | [10, 10]   | [0.3, 0.3] |      0.002 |    0.03 |      4 | False       | False    |
+|     1.659 |     0.175 |     4 |      0.05 |        3.7 |     2.5 | [10, 10]   | [0.3, 0.3] |      0.002 |    0.03 |      2 | False       | False    |
 |     0.159 |     0.001 |     4 |      0.05 |        3.7 |     1.5 | [50, 50]   | [0.5, 0.5] |      0.001 |    0.03 |      2 | False       | False    |
 
 The agent training process was extremely turbulent, with many agents failing to converge toward an optimal policy. Indeed, in most cases the agent evaluation score peaked at some point before episode 200,000. We are primarily interested in the maximum monster speed against which an agent can succeed, and so the long term instability of an agent is acceptable.

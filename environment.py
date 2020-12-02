@@ -19,7 +19,8 @@ class LakeMonsterEnvironment(PyEnvironment):
                timeout_factor=3,
                step_size=0.1,
                n_actions=8,
-               use_mini_rewards=True):
+               use_mini_rewards=True,
+               **kwargs):
     super().__init__()
 
     self.monster_speed = monster_speed
@@ -50,6 +51,7 @@ class LakeMonsterEnvironment(PyEnvironment):
     self.is_monster_caught_up = False
 
     # for rendering
+    self.prev_agent_rotation = 0.0
     self.total_agent_rotation = 0.0
     self.total_monster_rotation = 0.0
     self.action_vector = None
@@ -69,6 +71,7 @@ class LakeMonsterEnvironment(PyEnvironment):
     self.n_steps = 0
     self.highest_r_attained = 0.0
     self.is_monster_caught_up = False
+    self.prev_agent_rotation = 0.0
     self.total_agent_rotation = 0.0
     self.total_monster_rotation = 0.0
     self.action_vector = None
@@ -121,8 +124,11 @@ class LakeMonsterEnvironment(PyEnvironment):
     """Helper function for _step method."""
     self.action_vector = self.step_size * self.action_to_direction[action]
     position = np.array((self.r, 0)) + self.action_vector
+    if position[0] == 0.0:
+      position[0] += np.random.random() * 1e-6  # avoid arctan issues
     self.r = np.linalg.norm(position)
     theta = np.arctan2(position[1], position[0])
+    self.prev_agent_rotation = self.total_agent_rotation
     self.total_agent_rotation += theta
     return theta
 
@@ -170,6 +176,7 @@ class LakeMonsterEnvironment(PyEnvironment):
     if self._episode_ended:
       reward, result = self.determine_reward()
     params = {'r': self.r,
+              'prev_agent_rotation': self.prev_agent_rotation,
               'total_agent_rotation': self.total_agent_rotation,
               'total_monster_rotation': self.total_monster_rotation,
               'action_vector': self.action_vector,
