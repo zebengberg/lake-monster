@@ -17,12 +17,6 @@ class JumpingEnvironment(LakeMonsterEnvironment):
     self.has_jumped = False
     return super()._reset()
 
-  @property
-  def _state(self):
-    state = list(super()._state)
-    state += [int(self.has_jumped)]
-    return np.array(state, dtype=np.float32)
-
   def _step(self, action):
     if not self.has_jumped and self.r > self.jump_at_r:
       theta = 2 * np.pi * np.random.random()
@@ -68,4 +62,7 @@ class MultiMonsterEnvironment(LakeMonsterEnvironment):
     return self.conclude_step()
 
   def render(self, mode='rgb_array'):
-    return super().render(mode=self.total_monster_rotations)
+    mode_list = self.total_monster_rotations.copy()
+    if mode == 'return_real':
+      mode_list += ['return_real']
+    return super().render(mode=mode_list)

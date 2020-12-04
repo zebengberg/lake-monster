@@ -135,7 +135,7 @@ As `n_actions` and `timeout_factor` grow large and `step_size` approaches 0, the
 
 The lake-monster problem provides a forgiving environment for the agent. If the agent makes poor decisions, it has the ability to correct them by taking actions to bring the environment back to its initial state. In the optimal solution, an agent would never arrive at a position radially inline with the monster. In the gif below, this occurs when the velocity vector changes color. The agent retreats from this sub-optimal state before continuing on to eventually succeed.
 
-|             ![rewards](assets/path.gif)             |
+|          ![missteps](assets/missteps.gif)           |
 | :-------------------------------------------------: |
 | _A well-trained agent correcting initial missteps._ |
 
@@ -148,10 +148,6 @@ Parameters such as `monster_speed`, `step_size`, and `learning_rate` can be adju
 Extending this idea, the parameters `use_step_schedule` and `use_mastery` modify the variables`step_size` and `monster_speed` over the course of training. Utilizing a mastery-based approach generally leads to better learning outcomes. All of the agents from the [Results](#results) section use this mastery-based regimen.
 
 Agent policies are periodically cached (see [Usage](#usage)) for later use. A saved policy can be revived and tested with modified parameters. Agents receiving extensive training can often succeed against faster monsters than those encountered in training. Specifically, agents have more opportunity to make precise movements when they able to take small steps. A well-trained agent can leverage this precision in their advantage.
-
-|                                                                                                              ![many agents](assets/many.gif)                                                                                                               |
-| :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
-| _A collection of agents in various states of training. Here, the monster is fixed in place and all agents are rotated toward the monster. Agents that stick to the shore have successfully escaped; those that wobble or wander will eventually be eaten._ |
 
 ### Nontrival Learning
 
@@ -173,9 +169,15 @@ The [optimal mathematical solution](http://datagenetics.com/blog/october12013/in
 
 Periodically throughout training, agents are evaluated using the [evaluation](evaluation.py) module. Agent policies are placed in a series of different environments in which the `monster_speed` and `step_size` parameters are dynamically updated depending on the agent's performance. In this way, an agent can be probed to determine the maximum monster speed at which it can escape. The best result from these evaluations are logged in the `results.json` file.
 
+_Below are several collections of agents in various states of training. Here, the monster is fixed in place and all agents are rotated toward the monster. Agents that stick to the shore have successfully escaped; those that wobble or wander will eventually be eaten. Many agents cling to the positive x-axis: the monster is fast enough to remain in line with them. Each gif shows the evolution of a single agent whose policies are timestamped over the learning process._
+
+![many agents 1](assets/many1.gif)
+![many agents 2](assets/many2.gif)
+![many agents 3](assets/many3.gif)
+
 ### Random parameters
 
-A number of agents were trained for several hundred thousand episodes by running `python train.py many`. Each agent was initialized with random environment parameters and model hyperparameters specified in the [utils](utils.py) module. Results of these training trials are shown in the table below.
+Several dozen agents were trained for roughly half a million episodes by running `python train.py many`. Training sessions took 12 - 24 hours on a 2015 Macbook. Each agent was initialized with random parameters specified in the [utils](utils.py) module. Results of these training sessions are shown in the table below.
 
 | max speed | avg speed | n act | init step | init speed | timeout | layers     | dropout    | learn rate | epsilon | update | categorical | schedule |
 | --------: | --------: | ----: | --------: | ---------: | ------: | :--------- | :--------- | ---------: | ------: | -----: | :---------- | :------- |
@@ -214,29 +216,51 @@ A number of agents were trained for several hundred thousand episodes by running
 |     1.659 |     0.175 |     4 |      0.05 |        3.7 |     2.5 | [10, 10]   | [0.3, 0.3] |      0.002 |    0.03 |      2 | False       | False    |
 |     0.159 |     0.001 |     4 |      0.05 |        3.7 |     1.5 | [50, 50]   | [0.5, 0.5] |      0.001 |    0.03 |      2 | False       | False    |
 
-The agent training process was extremely turbulent, with many agents failing to converge toward an optimal policy. Indeed, in most cases the agent evaluation score peaked at some point before episode 200,000. We are primarily interested in the maximum monster speed against which an agent can succeed, and so the long term instability of an agent is acceptable.
+The agent training process was extremely turbulent, with many agents failing to converge toward an optimal policy. Indeed, in most cases the agent evaluation score peaked at some point before episode 200,000. The maximum monster speed is the key metric of interest, and so long term instability of an agent is acceptable.
 
-|             ![rewards](assets/results.png)             |
+|             ![results](assets/results.png)             |
 | :----------------------------------------------------: |
 | _Smoothed evaluation scores over the training period._ |
 
-### Best results
+### Strongest results
 
-Default agent parameters were chosen based on the table above. More agents were trained using the default parameters. Results are shown below.
+Below are several gifs showing the strongest agent encountered through training. This agent is evaluated at various step sizes and monster speeds.
 
-To appear....
+|                 ![medium step](assets/best3.gif)                  |
+| :---------------------------------------------------------------: |
+| _The strongest discovered agent evaluated at a medium step size._ |
+
+|              ![small step](assets/best2.gif)              |
+| :-------------------------------------------------------: |
+| _The same agent as above evaluated at a small step size._ |
+
+|              ![very small step](assets/best1.gif)              |
+| :------------------------------------------------------------: |
+| _The same agent as above evaluated at a very small step size._ |
 
 ## Variations
 
-We considered two slight variations of the lake monster problem.
+We consider two slight variations of the lake monster problem.
 
 ### Jumping
 
 In the `JumpingEnvironment` class, the monster randomly teleports to a new location at some randomly chosen step within the episode. In such an environment, it is possible for the agent to (occasionally) succeed against a monster with arbitrarily high speed. If the monster jumps exactly when the agent is close to the lake shore, the agent may would be able to reach the shore before the monster is able to return. Additional interesting agent movement patterns can be learned in this environment, and this environment can also be used to test the adaptability of an agent trained in the `LakeMonsterEnvironment`.
 
+|                                                                                                                                                                   ![jump capture](assets/jump_capture.gif)                                                                                                                                                                    |
+| :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| _This agent trained in `LakeMonsterEnvironment` is not able to transfer learned knowledge and gets captured by the jumping monster. Although this agent had a clear opportunity to escape, it couldn't capitalize on the monster's jump. While some policies trained with `LakeMonsterEnvironment` can adapt to a jump, the agent's confusion in the example is more common._ |
+
+|                        ![jump success](assets/jump_success.gif)                         |
+| :-------------------------------------------------------------------------------------: |
+| _An agent trained in `LakeMonsterEnvironment` successfully transferring its knowledge._ |
+
 ### Multi-monster
 
-In `MultiMonsterEnvironment`, the lake monster problem is initialized with n monsters distributed over the shore of the lake. As is the case with a single monster, all monsters in this environment behavior greedily: rather than collaborating to capture the agent, they all act independently and move toward the point on the shore closest to the human. With sufficient time, the optimal strategy for the agent is only slightly harder than in the original problem. The agent should simply lure all of the monsters toward a common point. Once the monsters coalesce, the agent can then behave as if facing a single monster.
+In `MultiMonsterEnvironment`, the lake monster problem is initialized with n monsters equidistributed over the shore of the lake. As is the case with a single monster, all monsters in this environment behavior greedily: rather than collaborating to capture the agent, they all act independently and move toward the point on the shore closest to the human. With sufficient time, the optimal strategy for the agent is only slightly harder than in the original problem. The agent should simply lure all of the monsters toward a common point. Once the monsters coalesce, the agent can then behave as if facing a single monster.
+
+|             ![multi monster](assets/multi.gif)             |
+| :--------------------------------------------------------: |
+| _A MultiMonsterAgent after finding a successful strategy._ |
 
 ## License
 

@@ -141,8 +141,8 @@ def print_strongest_policies():
     # printing out high speed policies separately from markdown
     episode = df[p].idxmax()
     speed = df[p][episode]
-    if speed > 4.2:
-      print(p + '-' + str(episode))
+    if speed > 4.3:
+      print(speed, p + '-' + str(episode))
 
     results = {}
     results['max speed'] = round(speed, 3)

@@ -188,7 +188,12 @@ class LakeMonsterEnvironment(PyEnvironment):
               'step_size': self.step_size,
               'is_caught': self.is_monster_caught_up}
 
+    # monkey patch for MultiMonsterEnvironment to avoid changing ABC signature
     if isinstance(mode, list):
+      if mode[-1] == 'return_real':
+        params['return_real'] = True
+        params['multi_monster_rotations'] = mode[:-1]
+        return renderer(**params)
       params['multi_monster_rotations'] = mode
       im = renderer(**params)
       return np.array(im)

@@ -124,7 +124,7 @@ def generate_jump():
   if confirm_new():
     uid = str(uuid.uuid1().int)
     print('Initializing new JumpingAgent with default parameters.\n')
-
+    params = {}
     test_agent(uid, params)
     log_graph(uid, params)
     log_uid(uid)
@@ -185,9 +185,9 @@ def parse_args():
   elif len(args) == 1:
     if os.path.exists('agent_id.txt'):
       a = restore_existing_agent()
-      launch_tb(a.get_uid())
     else:
       a = build_new_agent()
+    launch_tb(a.get_uid())
     a.train_ad_infinitum()
 
   else:
