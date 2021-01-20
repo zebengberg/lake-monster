@@ -9,3 +9,8 @@ logs/
 policies/
 *.json
 agent_id.txt
+
+
+# new stuff
+data/
+*.egg_info

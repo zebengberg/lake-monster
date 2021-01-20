@@ -5,7 +5,7 @@ import numpy as np
 from tf_agents.environments.py_environment import PyEnvironment
 from tf_agents.specs.array_spec import BoundedArraySpec
 from tf_agents.trajectories import time_step
-from render import renderer
+from lake_monster.environment.render import renderer
 
 
 class LakeMonsterEnvironment(PyEnvironment):

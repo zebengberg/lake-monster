@@ -7,9 +7,9 @@ import uuid
 import webbrowser
 import datetime
 import tensorboard
-from agent import Agent, MultiMonsterAgent, JumpingAgent
+from lake_monster.agent.agent import Agent, MultiMonsterAgent, JumpingAgent
 from test_agent import test_agent, log_graph
-from utils import get_random_params, log_params, log_uid, read_params
+from lake_monster.utils import get_random_params, log_params, log_uid, read_params
 
 
 def launch_tb(uid):

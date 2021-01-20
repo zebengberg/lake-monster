@@ -6,6 +6,7 @@ import json
 import glob
 import tensorflow as tf
 import pandas as pd
+from lake_monster import configs
 
 # sorted from least complexity to most complexity
 param_universe = {

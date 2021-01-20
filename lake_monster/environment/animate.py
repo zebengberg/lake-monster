@@ -8,15 +8,14 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 import imageio
-# including this import for pipreqs
-import imageio_ffmpeg  # pylint: disable=unused-import
 import pygifsicle
 from tf_agents.environments.tf_py_environment import TFPyEnvironment
 from tf_agents.policies import random_py_policy, scripted_py_policy
-from environment import LakeMonsterEnvironment
-from utils import tf_to_py
-from render import render_many_agents, render_agent_path
-from variations import JumpingEnvironment, MultiMonsterEnvironment
+from lake_monster.environment.environment import LakeMonsterEnvironment
+from lake_monster.utils import tf_to_py
+from lake_monster.environment.render import render_many_agents, render_agent_path
+from lake_monster.environment.variations import JumpingEnvironment, MultiMonsterEnvironment
+from lake_monster import configs
 
 
 # suppressing some annoying warnings
@@ -28,13 +27,13 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 def print_all_uuids():
   """Print list of all saved policy UUIDS along with last saved episode."""
-  d = os.listdir('policies')
+  d = os.listdir(configs.POLICIES_DIR)
   d = [f.split('-')[0] for f in d]
   d = set(d)
   for uid in d:
     try:
       uid = str(int(uid))
-      g = glob.glob('policies/' + uid + '*')
+      g = glob.glob(configs.POLICIES_DIR + uid + '*')
       g = [f.split('-')[1] for f in g]
       g = [int(f) for f in g]
       print(uid, max(g))
@@ -42,7 +41,7 @@ def print_all_uuids():
       continue
 
 
-def episode_as_video(py_env, policy, filename, fps=10):
+def episode_as_video(py_env, policy, filepath, fps=10):
   """Create mp4 video through py_environment render method."""
 
   tf_env = TFPyEnvironment(py_env)
@@ -58,10 +57,12 @@ def episode_as_video(py_env, policy, filename, fps=10):
 
   # giving video file a more descriptive name
   _, result = py_env.determine_reward()
-  if not os.path.exists('videos/'):
-    os.mkdir('videos/')
-  filename = os.path.join('videos/', filename + '-' + result + '.mp4')
-  os.rename('tmp.mp4', filename)
+
+  assert filepath.split('.')[1] == 'mp4'
+  split = filepath.split('.')
+  split[0] += '-' + result
+  filepath = '.'.join(split)
+  os.rename('tmp.mp4', filepath)
 
 
 def episode_as_gif(py_env, policy, save_path, fps=10, show_path=True):
@@ -74,6 +75,7 @@ def episode_as_gif(py_env, policy, save_path, fps=10, show_path=True):
     # using the policy_state to deal with scripted_policy possibility
     policy_state = policy.get_initial_state(batch_size=1)
     gif.append_data(py_env.render())
+
     while not time_step.is_last():
       action = policy.action(time_step, policy_state)
       time_step = tf_env.step(action.action)
@@ -83,6 +85,7 @@ def episode_as_gif(py_env, policy, save_path, fps=10, show_path=True):
         im = render_agent_path(im, path)
       policy_state = action.state
       gif.append_data(np.array(im))
+
     for _ in range(fps):  # play for 1 more seconds
       gif.append_data(py_env.render())
   pygifsicle.optimize(save_path)
@@ -93,9 +96,12 @@ def create_random_gif():
   env_params = {'monster_speed': 0.7, 'timeout_factor': 20,
                 'step_size': 0.05, 'n_actions': 8}
   py_env = LakeMonsterEnvironment(**env_params)
-  policy = random_py_policy.RandomPyPolicy(time_step_spec=None,
-                                           action_spec=py_env.action_spec())
-  episode_as_gif(py_env, policy, save_path='assets/random.gif')
+  policy = random_py_policy.RandomPyPolicy(
+      time_step_spec=None,
+      action_spec=py_env.action_spec())
+
+  save_path = os.path.join(configs.ASSETS_DIR, 'random.gif')
+  episode_as_gif(py_env, policy, save_path=save_path)
 
 
 def create_action_gif():
@@ -105,13 +111,17 @@ def create_action_gif():
                 'step_size': 0.5, 'n_actions': n_actions}
   py_env = LakeMonsterEnvironment(**env_params)
   action_script = [(1, 0), (1, n_actions // 2)]
+
   for _ in range(n_actions - 1):
     action_script.append((1, 1))  # step forward
     action_script.append((1, n_actions // 2))  # back
-  policy = scripted_py_policy.ScriptedPyPolicy(time_step_spec=None,
-                                               action_spec=py_env.action_spec(),
-                                               action_script=action_script)
-  episode_as_gif(py_env, policy, 'assets/actions.gif', fps=1, show_path=False)
+  policy = scripted_py_policy.ScriptedPyPolicy(
+      time_step_spec=None,
+      action_spec=py_env.action_spec(),
+      action_script=action_script)
+
+  save_path = os.path.join(configs.ASSETS_DIR, 'actions.gif')
+  episode_as_gif(py_env, policy, save_path, fps=1, show_path=False)
 
 
 def create_many_policy_gif(uid, file_path, monster_speed=4.0):
@@ -119,7 +129,7 @@ def create_many_policy_gif(uid, file_path, monster_speed=4.0):
   n_steps = 300  # = timeout_factor / step_size
   step_size = 0.01
   fps = 10
-  p_paths = glob.glob('policies/' + uid + '*')
+  p_paths = glob.glob(configs.POLICIES_DIR + uid + '*')
 
   all_positions = []
   colors = []
@@ -172,7 +182,7 @@ def explore_policies():
            '198118059822011761597806885923646036845-88000',
            '207187742707064940724130546035145792365-186000']
 
-  paths = ['policies/' + p for p in paths]
+  paths = [os.path.join(configs.POLICIES_DIR, p) for p in paths]
   for i, p_path in enumerate(paths):
     if os.path.exists(p_path):
       policy = tf.saved_model.load(p_path)
@@ -188,49 +198,50 @@ def explore_policies():
 def create_assets():
   """Create readme assets with specific saved policies."""
   # creating gifs for the readme
-  if not os.path.exists('assets/'):
-    os.mkdir('assets')
-  if not os.path.exists('temp/'):
-    os.mkdir('temp')
   create_random_gif()
   create_action_gif()
+
   uid = '150781952464835427521861702579725067620'
-  file_path = 'assets/many1.gif'
+  file_path = os.path.join(configs.ASSETS_DIR, 'many1.gif')
   create_many_policy_gif(uid, file_path)
   uid = '131627975635229415516782144963914819618'
-  file_path = 'assets/many2.gif'
+  file_path = os.path.join(configs.ASSETS_DIR, 'many2.gif')
   create_many_policy_gif(uid, file_path)
   uid = '80732143607727547094796928126813095227'
-  file_path = 'assets/many3.gif'
+  file_path = os.path.join(configs.ASSETS_DIR, 'many3.gif')
   create_many_policy_gif(uid, file_path, 2.5)
   explore_policies()
 
-  p_path = 'policies/65601302196810597370436998403635834824-12000'
+  p_path = os.path.join(configs.POLICIES_DIR,
+                        '65601302196810597370436998403635834824-12000')
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
     py_env = LakeMonsterEnvironment(step_size=0.02, monster_speed=3.7,
                                     use_mini_rewards=True)
-    save_path = 'assets/reward.gif'
+    save_path = os.path.join(configs.ASSETS_DIR, 'reward.gif')
     print('Creating ' + save_path)
     episode_as_gif(py_env, policy, save_path)
 
-  p_path = 'policies/87497411048514251456633633962304499656-83200'
+  p_path = os.path.join(configs.POLICIES_DIR,
+                        '87497411048514251456633633962304499656-83200')
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
     py_env = LakeMonsterEnvironment(step_size=0.02, monster_speed=3.75)
-    save_path = 'assets/capture.gif'
+    save_path = os.path.join(configs.ASSETS_DIR, 'capture.gif')
     print('Creating ' + save_path)
     episode_as_gif(py_env, policy, save_path)
 
-  p_path = 'policies/87497411048514251456633633962304499656-172100'
+  p_path = os.path.join(configs.POLICIES_DIR,
+                        '87497411048514251456633633962304499656-172100')
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
     py_env = LakeMonsterEnvironment(step_size=0.01, monster_speed=4.2)
-    save_path = 'assets/strong.gif'
+    save_path = os.path.join(configs.ASSETS_DIR, 'strong.gif')
     print('Creating ' + save_path)
     episode_as_gif(py_env, policy, save_path)
 
-  p_path = 'policies/28000982797640512868211384605769524580-510000'
+  p_path = os.path.join(configs.POLICIES_DIR,
+                        '28000982797640512868211384605769524580-510000')
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
     env_params = policy.get_metadata()
@@ -238,33 +249,35 @@ def create_assets():
     env_params['step_size'] = 0.001
     env_params['monster_speed'] = 4.52
     py_env = LakeMonsterEnvironment(**env_params)
-    save_path = 'assets/best1.gif'
+    save_path = os.path.join(configs.ASSETS_DIR, 'best1.gif')
     print('Creating ' + save_path)
     episode_as_gif(py_env, policy, save_path, fps=60)
 
     env_params['step_size'] = 0.003
     env_params['monster_speed'] = 4.4
     py_env = LakeMonsterEnvironment(**env_params)
-    save_path = 'assets/best2.gif'
+    save_path = os.path.join(configs.ASSETS_DIR, 'best2.gif')
     print('Creating ' + save_path)
     episode_as_gif(py_env, policy, save_path, fps=30)
 
     env_params['step_size'] = 0.02
     env_params['monster_speed'] = 4.3
     py_env = LakeMonsterEnvironment(**env_params)
-    save_path = 'assets/best3.gif'
+    save_path = os.path.join(configs.ASSETS_DIR, 'best3.gif')
     print('Creating ' + save_path)
     episode_as_gif(py_env, policy, save_path)
 
-  p_path = 'policies/87497411048514251456633633962304499656-136600'
+  p_path = os.path.join(configs.POLICIES_DIR,
+                        '87497411048514251456633633962304499656-136600')
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
     py_env = LakeMonsterEnvironment(step_size=0.01, monster_speed=4.1)
-    save_path = 'assets/missteps.gif'
+    save_path = os.path.join(configs.ASSETS_DIR, 'missteps.gif')
     print('Creating ' + save_path)
     episode_as_gif(py_env, policy, save_path)
 
-  p_path = 'policies/36716354962105796536622825194778333824-350000'
+  p_path = os.path.join(configs.POLICIES_DIR,
+                        '36716354962105796536622825194778333824-350000')
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
     env_params = policy.get_metadata()
@@ -274,11 +287,11 @@ def create_assets():
     env_params['step_size'] = 0.02
     py_env = JumpingEnvironment(**env_params)
     for i in range(10):
-      save_path = f'temp/jump_{i}.gif'
+      save_path = os.path.join(configs.TEMP_DIR, f'jump_{i}.gif')
       print('Creating ' + save_path)
       episode_as_gif(py_env, policy, save_path)
 
-  p_path = glob.glob('policies/multi_policies/*-450000')[0]
+  p_path = glob.glob(configs.POLICIES_DIR + '/multi_policies/*-450000')[0]
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
     env_params = policy.get_metadata()
@@ -286,7 +299,7 @@ def create_assets():
     env_params['monster_speed'] = 4.05
     env_params['step_size'] = 0.01
     py_env = MultiMonsterEnvironment(**env_params)
-    save_path = 'assets/multi.gif'
+    save_path = os.path.join(configs.ASSETS_DIR, 'multi.gif')
     print('Creating ' + save_path)
     episode_as_gif(py_env, policy, save_path)
 

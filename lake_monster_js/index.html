@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>lake monster</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+
+  <body>
+    <h1>lake monster</h1>
+    <div>
+      <input type="checkbox" id="checkbox" />
+      <label>show circle</label>
+    </div>
+    <div>
+      <input
+        class="slider"
+        type="range"
+        id="slider"
+        min="0.5"
+        max="5.0"
+        step="0.01"
+      />
+      <label id="label" for="slider"></label>
+    </div>
+    <canvas id="canvas"></canvas>
+    <script src="script.js" />
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"></script>
+  </body>
+</html>

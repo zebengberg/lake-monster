@@ -1,7 +1,7 @@
 """Define classes derived from LakeMonsterEnvironment."""
 
 import numpy as np
-from environment import LakeMonsterEnvironment
+from lake_monster.environment.environment import LakeMonsterEnvironment
 
 
 class JumpingEnvironment(LakeMonsterEnvironment):

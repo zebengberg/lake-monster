@@ -1,6 +1,8 @@
 """Test the environment module."""
 
 
+import os
+import glob
 from tqdm import tqdm
 import numpy as np
 import imageio
@@ -8,9 +10,10 @@ from tf_agents.environments.utils import validate_py_environment
 from tf_agents.environments.tf_py_environment import TFPyEnvironment
 from tf_agents.policies.random_py_policy import RandomPyPolicy
 from tf_agents.policies.random_tf_policy import RandomTFPolicy
-from environment import LakeMonsterEnvironment
-from animate import episode_as_video
-from variations import JumpingEnvironment, MultiMonsterEnvironment
+from lake_monster.environment.environment import LakeMonsterEnvironment
+from lake_monster.environment.animate import episode_as_video
+from lake_monster.environment.variations import JumpingEnvironment, MultiMonsterEnvironment
+from lake_monster import configs
 
 
 # nice environment parameters for testing with random policy
@@ -21,12 +24,10 @@ params = {'monster_speed': 0.7,
           'use_mini_rewards': True}
 
 
-def validate_environment():
+def test_validate_environment():
   """Test environment using built-in validate tool."""
-  print('Validating environment ...')
   env = LakeMonsterEnvironment()
   validate_py_environment(env, episodes=50)
-  print('Test successful.')
 
 
 def test_py_environment_with_random(n_episodes=100):
@@ -63,7 +64,6 @@ def test_py_environment_with_random(n_episodes=100):
 def test_tf_environment_with_random(n_episodes=20):
   """Test tf environment through random actions."""
   print(f'Testing tf environment over {n_episodes} episodes.')
-  print("You may see warnings related to TF's preferences for hardware.")
   env = LakeMonsterEnvironment(**params)
   env = TFPyEnvironment(env)
   policy = RandomTFPolicy(time_step_spec=env.time_step_spec(),
@@ -94,18 +94,19 @@ def test_video():
   """Run an episode and save video to file."""
   env = LakeMonsterEnvironment(**params)
   policy = RandomPyPolicy(time_step_spec=None, action_spec=env.action_spec())
-  episode_as_video(env, policy, filename='test')
+  filepath = os.path.join(configs.TEMP_DIR, 'test.mp4')
+  episode_as_video(env, policy, filepath=filepath)
+  assert glob.glob(filepath.split('.')[0] + '*')
 
 
 def test_movement():
   """Test handcrafted movements on fast monster."""
-  print('Creating video of handcrafted strong monster.')
 
   env = LakeMonsterEnvironment(3.5, 3.0, 0.1, 6)
   fps = 10
   actions = [0, 0, 0, 0, 0, 5, 5, 5, 5, 5, 5, 5, 1, 3]
-  path = 'videos/test-handcrafted.mp4'
-  with imageio.get_writer(path, fps=fps) as video:
+  filepath = os.path.join(configs.TEMP_DIR, 'test-handcrafted.mp4')
+  with imageio.get_writer(filepath, fps=fps) as video:
     time_step = env.reset()
     video.append_data(env.render())
     while not time_step.is_last():
@@ -113,38 +114,24 @@ def test_movement():
       time_step = env.step(action)
       video.append_data(env.render())
     video.append_data(env.render())
-  print(f'Video created and saved as {path}')
+  assert glob.glob(filepath.split('.')[0] + '*')
 
 
 def test_jumping():
   """Test jumping environment."""
-  print('Testing jumping environment.')
   env = JumpingEnvironment(**params)
   validate_py_environment(env, episodes=10)
   policy = RandomPyPolicy(time_step_spec=None, action_spec=env.action_spec())
-  episode_as_video(env, policy, filename='test_jumping')
+  filepath = os.path.join(configs.TEMP_DIR, 'test_jumping.mp4')
+  episode_as_video(env, policy, filepath=filepath)
+  assert glob.glob(filepath.split('.')[0] + '*')
 
 
 def test_multi_monster():
   """Test multi-monster environment."""
-  print('Testing multi-monster environment.')
   env = MultiMonsterEnvironment(n_monsters=3, **params)
   validate_py_environment(env, episodes=10)
   policy = RandomPyPolicy(time_step_spec=None, action_spec=env.action_spec())
-  episode_as_video(env, policy, filename='test_multi')
-
-
-if __name__ == '__main__':
-  print('\n' + '#' * 65)
-  validate_environment()
-  print('\n' + '#' * 65)
-  test_py_environment_with_random()
-  print('\n' + '#' * 65)
-  test_tf_environment_with_random()
-  print('\n' + '#' * 65)
-  test_video()
-  test_movement()
-  test_jumping()
-  test_multi_monster()
-  print('\n' + '#' * 65)
-  print('All tests pass.')
+  filepath = os.path.join(configs.TEMP_DIR, 'test_multi.mp4')
+  episode_as_video(env, policy, filepath=filepath)
+  assert glob.glob(filepath.split('.')[0] + '*')

@@ -13,11 +13,12 @@ from tf_agents.utils import common
 from tf_agents.replay_buffers.tf_uniform_replay_buffer import TFUniformReplayBuffer
 from tf_agents.drivers.dynamic_episode_driver import DynamicEpisodeDriver
 from tf_agents.policies.policy_saver import PolicySaver
-from environment import LakeMonsterEnvironment
-from variations import MultiMonsterEnvironment, JumpingEnvironment
-from animate import episode_as_video
-from evaluate import evaluate_episode, probe_policy
-from utils import log_results, py_to_tf
+from lake_monster.environment.environment import LakeMonsterEnvironment
+from lake_monster.environment.variations import MultiMonsterEnvironment, JumpingEnvironment
+from lake_monster.environment.animate import episode_as_video
+from lake_monster.agent.evaluate import evaluate_episode, probe_policy
+from lake_monster.utils import log_results, py_to_tf
+from lake_monster import configs
 
 
 # suppressing some annoying warnings
@@ -97,7 +98,8 @@ class Agent:
 
     # summary writer for tensorboard
     self.uid = tf.Variable(uid, dtype=tf.string)
-    self.writer = tf.summary.create_file_writer('logs/' + self.get_uid())
+    log_dir = os.path.join(configs.LOG_DIR, self.get_uid())
+    self.writer = tf.summary.create_file_writer(log_dir)
     self.writer.set_as_default()
 
     # defining items which are tracked in checkpointer
@@ -195,7 +197,7 @@ class Agent:
   def build_checkpointer(self):
     """Build checkpointer."""
     return common.Checkpointer(
-        ckpt_dir='checkpoints/',
+        ckpt_dir=configs.CHECKPOINT_DIR,
         max_to_keep=3,
         # the rest of the parameters are optional kwargs
         agent=self.agent,
@@ -259,7 +261,7 @@ class Agent:
                         metadata=metadata,
                         batch_size=None)
     dir_name = f'{self.uid.numpy().decode()}-{step}'
-    filepath = os.path.join('policies', dir_name)
+    filepath = os.path.join(configs.POLICY_DIR, dir_name)
     saver.save(filepath)
     print('Policy saved.')
 

@@ -1,11 +1,13 @@
 """A module for evaluating policies."""
 
+import os
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
 from tf_agents.environments.tf_py_environment import TFPyEnvironment
-from environment import LakeMonsterEnvironment
-from variations import MultiMonsterEnvironment, JumpingEnvironment
+from lake_monster.environment.environment import LakeMonsterEnvironment
+from lake_monster.environment.variations import MultiMonsterEnvironment, JumpingEnvironment
+from lake_monster import configs
 
 
 def evaluate_episode(policy, env_params):
@@ -83,7 +85,7 @@ def probe_policy(policy, env_params):
 
 def result_df():
   """Return DataFrame of monster speed data in results.json."""
-  with open('results.json') as f:
+  with open(configs.RESULTS_PATH) as f:
     data = json.load(f)
   dfs = []
   params = {}
@@ -113,7 +115,8 @@ def plot_results(policies=None):
   plt.title('Smoothed evaluation scores over training')
   # plt.legend(loc='lower right', fontsize='xx-small')
   plt.grid()
-  plt.savefig('assets/results.png', dpi=300)
+  save_path = os.path.join(configs.ASSETS_DIR, 'results.png')
+  plt.savefig(save_path, dpi=300)
   plt.show()
 
 
