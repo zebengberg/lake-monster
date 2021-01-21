@@ -2,21 +2,23 @@
 
 import sys
 import os
-import shutil
+import glob
 import uuid
 import webbrowser
 import datetime
 import tensorboard
 from lake_monster.agent.agent import Agent, MultiMonsterAgent, JumpingAgent
-from test_agent import test_agent, log_graph
+from lake_monster.agent.verify import verify_agent, log_graph
 from lake_monster.utils import get_random_params, log_params, log_uid, read_params
+from lake_monster import configs
 
 
 def launch_tb(uid):
   """Launch tensorboard in a new browser tab."""
   print('Launching tensorboard. It will open shortly in a browser tab ...')
   tb = tensorboard.program.TensorBoard()
-  tb.configure(logdir='logs/' + uid)
+  logdir = os.path.join(configs.LOG_DIR, uid)
+  tb.configure(logdir=logdir)
   url = tb.launch()
   url += '#scalars&_smoothingWeight=0.95'
   webbrowser.open_new_tab(url)
@@ -24,7 +26,7 @@ def launch_tb(uid):
 
 def build_new_agent(use_random=False):
   """Build new agent from scratch."""
-  if os.path.exists('agent_id.txt'):
+  if os.path.exists(configs.AGENT_ID_PATH):
     raise ValueError('Found partially trained agent already!')
   uid = str(uuid.uuid1().int)
   if use_random:
@@ -36,7 +38,7 @@ def build_new_agent(use_random=False):
     print('Initializing new agent with default parameters.\n')
     params = {}
 
-  test_agent(uid, params)
+  verify_agent(uid, params)
   log_graph(uid, params)
   log_uid(uid)
   log_params(uid, params)
@@ -50,35 +52,35 @@ def restore_existing_agent():
   print('Restored agent has parameters:')
   print(params)
   print('')
-  test_agent(uid, params)
+  verify_agent(uid, params)
   return Agent(uid, **params)
 
 
 def clear_knowledge():
   """Remove videos and checkpoints saved during last trained agent."""
-  if os.path.exists('videos/'):
-    shutil.rmtree('videos/')
-  if os.path.exists('checkpoints/'):
-    shutil.rmtree('checkpoints/')
-  if os.path.exists('agent_id.txt'):
-    os.remove('agent_id.txt')
+  for f in glob.glob(configs.VIDEO_DIR + '/*'):
+    os.remove(f)
+  for f in glob.glob(configs.CHECKPOINT_DIR + '/*'):
+    os.remove(f)
+  if os.path.exists(p := configs.AGENT_ID_PATH):
+    os.remove(p)
 
 
 def clear_all_knowledge():
   """Clear all saved policies, results, logs, videos, and checkpoints."""
   if input('Do you want to clear all knowledge and statistics? (y/n) ') == 'y':
     clear_knowledge()
-    if os.path.exists('policies/'):
-      shutil.rmtree('policies/')
-    if os.path.exists('results.json'):
-      os.remove('results.json')
-    if os.path.exists('logs/'):
-      shutil.rmtree('logs/')
+    if os.path.exists(p := configs.RESULTS_PATH):
+      os.remove(p)
+    for f in glob.glob(configs.LOG_DIR + '/*'):
+      os.remove(f)
+    for f in glob.glob(configs.POLICY_DIR + '/*'):
+      os.remove(f)
 
 
 def confirm_new():
   """Ask the user to confirm initialization of new agent."""
-  if os.path.exists('agent_id.txt'):
+  if os.path.exists(configs.AGENT_ID_PATH):
     if input('Clear partially trained agent? (y/n) ') == 'y':
       clear_knowledge()
       return True
@@ -125,7 +127,7 @@ def generate_jump():
     uid = str(uuid.uuid1().int)
     print('Initializing new JumpingAgent with default parameters.\n')
     params = {}
-    test_agent(uid, params)
+    verify_agent(uid, params)
     log_graph(uid, params)
     log_uid(uid)
     log_params(uid, params)

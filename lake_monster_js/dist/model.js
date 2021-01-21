@@ -1,13 +1,17 @@
 "use strict";
-// import * as tf from "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js";
-// const model = await tf.loadLayersModel(
-//   "/Users/robotics/projects/lake-monster/lake_monster_js/tfjs/model/model.json"
-// );
-const model = tf.sequential();
-document.addEventListener("mousemove", (e) => {
-    const x1 = e.clientX;
-    const x2 = e.clientY;
-    const y = 1;
-    //const y = model([[x1, x2]]);
-    console.log(x1, x2, y);
-});
+// declare const tf: any;
+// tf.loadGraphModel("./saved_model/model.json").then((model: any) => {
+//   console.log(model.summary());
+// });
+// const m = tf.loadGraphModel("./saved_model/model.json").then((model: any) => {
+//   console.log(model);
+//   document.addEventListener("mousemove", (e) => {
+//     const x1 = e.clientX / window.innerWidth;
+//     const x2 = e.clientY / window.innerHeight;
+//     const x = tf.tensor([[x1, x2, x1, x2, x1]]);
+//     let y = model.predict(x);
+//     y = y.dataSync()[0];
+//     console.log(y);
+//   });
+//   return model;
+// });

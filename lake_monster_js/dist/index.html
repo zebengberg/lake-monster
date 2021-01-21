@@ -4,12 +4,33 @@
     <meta charset="UTF-8" />
     <title>lake monster</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"></script>
   </head>
 
   <body>
-    <h1>hello!</h1>
-    <p id="pred"></p>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"></script>
-    <script src="model.js"></script>
+    <h1>lake monster</h1>
+    <div>
+      <input type="checkbox" id="cir-checkbox" />
+      <label>show circle</label>
+      <input type="checkbox" id="ai-checkbox" />
+      <label>ai control</label>
+      <input type="checkbox" id="path-checkbox" />
+      <label>show path</label>
+    </div>
+
+    <div>
+      <input
+        class="slider"
+        type="range"
+        id="slider"
+        min="0.5"
+        max="5.0"
+        step="0.01"
+      />
+      <label id="label" for="slider"></label>
+    </div>
+
+    <canvas id="canvas"></canvas>
+    <script src="script.js"></script>
   </body>
 </html>

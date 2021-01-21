@@ -319,7 +319,8 @@ class Agent:
   def run_summative(self, step):
     """Render a video of the agent, save a policy, and log results."""
     print('Creating video ...')
-    episode_as_video(self.py_env, self.agent.policy, f'episode-{step}')
+    filepath = os.path.join(configs.VIDEO_DIR, f'episode-{step}.mp4')
+    episode_as_video(self.py_env, self.agent.policy, filepath)
     print('Evaluating agent. You will see several lines of dots ...')
     result = probe_policy(self.agent.policy, self.env_params)
     result['n_episode'] = step
@@ -362,7 +363,7 @@ class MultiMonsterAgent(Agent):
     self.n_monsters = n_monsters
     super().__init__(uid, **kwargs)
 
-  @property
+  @ property
   def env_params(self):
     """Override from Agent."""
     params = super().env_params
@@ -389,7 +390,7 @@ class JumpingAgent(Agent):
   def __init__(self, uid, **kwargs):
     super().__init__(uid, **kwargs)
 
-  @property
+  @ property
   def env_params(self):
     """Override from Agent."""
     params = super().env_params

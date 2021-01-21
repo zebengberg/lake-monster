@@ -36,44 +36,44 @@ def get_random_params():
 
 def log_uid(uid):
   """Log the uid of the newly instantiated agent."""
-  with open('agent_id.txt', 'w') as f:
+  with open(configs.AGENT_ID_PATH, 'w') as f:
     f.write(uid)
 
 
 def read_params():
   """Use 'agent_id.txt' file to read all agent parameters."""
-  with open('agent_id.txt') as f:
+  with open(configs.AGENT_ID_PATH) as f:
     uid = f.read()
-  with open('results.json') as f:
+  with open(configs.RESULTS_PATH) as f:
     data = json.load(f)
   return uid, data[uid]['params']
 
 
 def log_params(uid, params):
   """Log parameters when first instantiating new agent."""
-  if os.path.exists('results.json'):
-    with open('results.json') as f:
+  if os.path.exists(configs.RESULTS_PATH):
+    with open(configs.RESULTS_PATH) as f:
       data = json.load(f)
     # making a backup copy first
-    os.rename('results.json', 'backup.json')
+    os.rename(configs.RESULTS_PATH, configs.BACKUP_RESULTS_PATH)
   else:
     data = {}
 
   assert uid not in data
   data[uid] = {'params': params, 'results': []}
 
-  with open('results.json', 'w') as f:
+  with open(configs.RESULTS_PATH, 'w') as f:
     json.dump(data, f, indent=2)
 
   # remove backup copy
-  if os.path.exists('backup.json'):
-    os.remove('backup.json')
+  if os.path.exists(configs.BACKUP_RESULTS_PATH):
+    os.remove(configs.BACKUP_RESULTS_PATH)
 
 
 def log_results(uid, results):
   """Record key evaluation results during training."""
 
-  with open('results.json') as f:
+  with open(configs.RESULTS_PATH) as f:
     data = json.load(f)
 
   assert uid in data
@@ -81,17 +81,17 @@ def log_results(uid, results):
   data[uid]['results'].append(results)
 
   # making a backup copy first
-  os.rename('results.json', 'backup.json')
-  with open('results.json', 'w') as f:
+  os.rename(configs.RESULTS_PATH, configs.BACKUP_RESULTS_PATH)
+  with open(configs.RESULTS_PATH, 'w') as f:
     json.dump(data, f, indent=2)
   # remove backup copy
-  os.remove('backup.json')
+  os.remove(configs.BACKUP_RESULTS_PATH)
 
 
 def merge_results(new_results_path, existing_results_path=None):
   """Merge results collected elsewhere."""
   if existing_results_path is None:
-    existing_results_path = 'results.json'
+    existing_results_path = configs.RESULTS_PATH
 
   with open(new_results_path) as f:
     new_data = json.load(f)
@@ -113,11 +113,11 @@ def merge_results(new_results_path, existing_results_path=None):
       data[k] = v
 
   # making a backup copy first
-  os.rename(existing_results_path, 'backup.json')
+  os.rename(existing_results_path, configs.BACKUP_RESULTS_PATH)
   with open(existing_results_path, 'w') as f:
     json.dump(data, f, indent=2)
   # remove backup copy
-  os.remove('backup.json')
+  os.remove(configs.BACKUP_RESULTS_PATH)
 
 
 def tf_to_py(d):
@@ -141,7 +141,7 @@ def py_to_tf(d):
 def build_df_from_tf_logs():
   """Use tf.summary logs to build DataFrame containing monster speeds."""
   tf.summary.flush()  # flushing anything that hasn't been written
-  log_data = glob.glob('logs/events*')
+  log_data = glob.glob(configs.LOG_DIR + '/*')
   speeds = {}
   scores = {}
   sizes = {}
