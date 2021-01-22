@@ -1,7 +1,9 @@
 """A tf-agent policy, driver, replay_buffer, and agent for the monster lake problem."""
 
-
+from __future__ import annotations
 import os
+from typing import Callable
+from dataclasses import dataclass
 import warnings
 import absl.logging
 import tensorflow as tf
@@ -54,57 +56,49 @@ def print_legend():
   print('#' * 65 + '\n')
 
 
+@dataclass
 class Agent:
   """A class to hold global variables for tf_agent training."""
-  replay_buffer_max_length = 1_000_000
-  batch_size = 64
 
-  def __init__(
-          self,
-          uid,
-          n_actions=16,
-          initial_step_size=0.1,
-          initial_monster_speed=4.0,
-          timeout_factor=2.0,
-          use_mini_rewards=True,
-          fc_layer_params=(100, 100),
-          dropout_layer_params=None,
-          learning_rate=0.001,
-          epsilon_greedy=0.1,
-          n_step_update=6,
-          use_categorical=True,
-          use_step_schedule=True,
-          use_mastery=True,
-          summative_callback=None):
+  uid: str
+  replay_buffer_max_length: int = 1_000_000
+  batch_size: int = 64
+  n_actions: int = 16
+  initial_step_size: float = 0.1
+  initial_monster_speed: float = 4.0
+  timeout_factor: float = 2.0
+  use_mini_rewards: bool = True
+  fc_layer_params: tuple[int, ...] = (100, 100)
+  dropout_layer_params: tuple[int, ...] | None = None
+  learning_rate: float = 0.001
+  epsilon_greedy: float = 0.1
+  n_step_update: int = 6
+  use_categorical: bool = True
+  use_step_schedule: bool = True
+  use_mastery: bool = True
+  summative_callback: Callable[[], bool] | None = None
+  use_random_start: bool = False
+  use_random_monster_speed: bool = False
+  use_random_step_size: bool = False
+  use_step_penalty: bool = False
+  use_evaluation: bool = True
 
-    self.n_actions = n_actions
-    self.initial_step_size = initial_step_size
-    self.initial_monster_speed = initial_monster_speed
-    self.timeout_factor = timeout_factor
-    self.use_mini_rewards = use_mini_rewards
-    self.fc_layer_params = fc_layer_params
-    self.dropout_layer_params = dropout_layer_params
-    self.learning_rate = learning_rate
-    self.epsilon_greedy = epsilon_greedy
-    self.n_step_update = n_step_update
-    self.use_categorical = use_categorical
-    self.use_step_schedule = use_step_schedule
-    self.use_mastery = use_mastery
-    self.summative_callback = summative_callback
-
+  def __post_init__(self):
     # variable for determining learning target mastery
     self.learning_score = 0
     self.reward_sum = 0
 
     # summary writer for tensorboard
-    self.uid = tf.Variable(uid, dtype=tf.string)
+    self.uid = tf.Variable(self.uid, dtype=tf.string)
     log_dir = os.path.join(configs.LOG_DIR, self.get_uid())
     self.writer = tf.summary.create_file_writer(log_dir)
     self.writer.set_as_default()
 
     # defining items which are tracked in checkpointer
-    self.monster_speed = tf.Variable(initial_monster_speed, dtype=tf.float64)
-    self.step_size = tf.Variable(initial_step_size, dtype=tf.float64)
+    self.monster_speed = tf.Variable(self.initial_monster_speed,
+                                     dtype=tf.float64)
+    self.step_size = tf.Variable(self.initial_step_size,
+                                 dtype=tf.float64)
     if self.use_categorical:
       self.dropout_layer_params = None  # overwriting
       self.q_net, self.agent = self.build_categorical_dqn_agent()
@@ -130,7 +124,11 @@ class Agent:
             'timeout_factor': self.timeout_factor,
             'step_size': self.step_size.numpy().item(),
             'n_actions': self.n_actions,
-            'use_mini_rewards': self.use_mini_rewards}
+            'use_mini_rewards': self.use_mini_rewards,
+            'use_random_start': self.use_random_start,
+            'use_random_monster_speed': False,
+            'use_random_step_size': False,
+            'use_step_penalty': False}
 
   def reset(self):
     """Reset member variables after updating monster_speed."""
@@ -303,7 +301,12 @@ class Agent:
 
   def run_formative(self, step):
     """Evaluate agent once, print results, and log metrics for TensorBoard."""
-    reward, n_steps = evaluate_episode(self.agent.policy, self.env_params)
+    env_params = self.env_params
+    # using a standard monster_speed for formative check
+    if self.use_random_monster_speed:
+      env_params['monster_speed'] = 4.0
+
+    reward, n_steps = evaluate_episode(self.agent.policy, env_params)
     self.reward_sum += reward
     tf.summary.scalar('reward', reward, step)
     tf.summary.scalar('n_env_steps', n_steps, step)
@@ -321,12 +324,15 @@ class Agent:
     print('Creating video ...')
     filepath = os.path.join(configs.VIDEO_DIR, f'episode-{step}.mp4')
     episode_as_video(self.py_env, self.agent.policy, filepath)
-    print('Evaluating agent. You will see several lines of dots ...')
-    result = probe_policy(self.agent.policy, self.env_params)
-    result['n_episode'] = step
-    print('Logging evaluation results ...')
-    print(result)
-    log_results(self.get_uid(), result)
+
+    if self.use_evaluation:
+      print('Evaluating agent. You will see several lines of dots ...')
+      result = probe_policy(self.agent.policy, self.env_params)
+      result['n_episode'] = step
+      print('Logging evaluation results ...')
+      print(result)
+      log_results(self.get_uid(), result)
+
     self.save_policy(step)
     if self.summative_callback is None:
       return False

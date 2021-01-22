@@ -10,7 +10,7 @@ const size = Math.min(window.innerWidth, window.innerHeight) - 100;
 canvas.height = size;
 canvas.width = size;
 const radius = 0.45 * size;
-const stepSize = 0.05;
+const stepSize = 0.02;
 let monsterSpeed = Number(slider.value);
 label.innerText = "monster speed: " + slider.value;
 slider.oninput = () => {
@@ -35,7 +35,7 @@ class Point {
     }
     draw() {
         const x = size / 2 + radius * this.x;
-        const y = size / 2 + radius * this.y;
+        const y = size / 2 - radius * this.y;
         const r = 10;
         ctx.beginPath();
         if (this.color !== null) {
@@ -87,9 +87,9 @@ class Path {
     draw() {
         if (this.path.length >= 2) {
             ctx.beginPath();
-            ctx.moveTo(size / 2 + radius * this.path[0].x, size / 2 + radius * this.path[0].y);
+            ctx.moveTo(size / 2 + radius * this.path[0].x, size / 2 - radius * this.path[0].y);
             for (let p of this.path) {
-                ctx.lineTo(size / 2 + radius * p.x, size / 2 + radius * p.y);
+                ctx.lineTo(size / 2 + radius * p.x, size / 2 - radius * p.y);
             }
             ctx.lineWidth = 3;
             ctx.strokeStyle = this.color;
@@ -140,10 +140,11 @@ function getState(pAgent, pMonster, pPath) {
         monsterSpeed,
         (pPath.path.length * stepSize) / 3.0,
         pAgent.norm,
-        angleDiff(pAgent.angle, pMonster.angle),
+        angleDiff(pMonster.angle, pAgent.angle),
     ];
 }
 function predToDirection(pred, pAgent) {
+    console.log(pred);
     let max = pred[0];
     let maxIndex = 0;
     for (let i = 1; i < pred.length; i++) {
@@ -152,9 +153,13 @@ function predToDirection(pred, pAgent) {
             maxIndex = i;
         }
     }
-    console.log(maxIndex);
     const theta = pAgent.angle + (2 * Math.PI * maxIndex) / pred.length;
-    return new Point(Math.cos(theta), Math.sin(theta));
+    const target = new Point(Math.cos(theta), Math.sin(theta));
+    console.log(maxIndex, pred.length);
+    console.log(pAgent.angle);
+    console.log(theta);
+    console.log(target);
+    return target;
 }
 function play(pAgent, pMonster, pPath, aiMove) {
     drawLake();
@@ -163,13 +168,18 @@ function play(pAgent, pMonster, pPath, aiMove) {
     if (pathCheckbox.checked) {
         pPath.draw();
     }
-    if (pAgent.norm > 1) {
+    let state = getState(pAgent, pMonster, pPath);
+    console.log("#######################");
+    console.log(agent);
+    console.log(monster);
+    console.log(state);
+    if (pAgent.norm >= 1) {
         gameOver = true;
         drawWinner(pAgent, pMonster);
     }
     if (!gameOver) {
         if (aiCheckbox.checked) {
-            const state = getState(pAgent, pMonster, pPath);
+            state = getState(pAgent, pMonster, pPath);
             const target = aiMove(state);
             pAgent.moveToTarget(target);
         }
@@ -179,6 +189,8 @@ function play(pAgent, pMonster, pPath, aiMove) {
         pMonster.moveAlongArc(pAgent.angle);
         pPath.append(pAgent);
     }
+    state = getState(pAgent, pMonster, pPath);
+    console.log(state);
 }
 const agent = new Point(0, 0, "red");
 const monster = new Point(1, 0, "lime");
@@ -188,7 +200,7 @@ path.append(agent);
 canvas.addEventListener("mousemove", (e) => {
     const rect = canvas.getBoundingClientRect();
     mouse.x = (e.clientX - rect.left - size / 2) / radius;
-    mouse.y = (e.clientY - rect.top - size / 2) / radius;
+    mouse.y = -(e.clientY - rect.top - size / 2) / radius;
 });
 let gameOver = false;
 document.addEventListener("keydown", (e) => {
@@ -203,7 +215,6 @@ document.addEventListener("keydown", (e) => {
 });
 tf.loadGraphModel("./saved_model/model.json").then((model) => {
     const aiMove = (state) => {
-        console.log(state);
         const x = tf.tensor([state]);
         let y = model.predict(x);
         y = y.dataSync();
@@ -211,5 +222,10 @@ tf.loadGraphModel("./saved_model/model.json").then((model) => {
         return target;
     };
     const update = () => play(agent, monster, path, aiMove);
-    setInterval(update, 200);
+    // document.addEventListener("keydown", (e) => {
+    //   if (e.key == "a") {
+    //     update();
+    //   }
+    // });
+    setInterval(update, 50);
 });

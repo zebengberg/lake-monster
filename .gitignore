@@ -14,3 +14,5 @@ agent_id.txt
 # new stuff
 data/
 *.egg_info
+lake_monster_js/dist/
+.pytest_cache

@@ -27,13 +27,13 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 def print_all_uuids():
   """Print list of all saved policy UUIDS along with last saved episode."""
-  d = os.listdir(configs.POLICIES_DIR)
+  d = os.listdir(configs.POLICY_DIR)
   d = [f.split('-')[0] for f in d]
   d = set(d)
   for uid in d:
     try:
       uid = str(int(uid))
-      g = glob.glob(configs.POLICIES_DIR + uid + '*')
+      g = glob.glob(configs.POLICY_DIR + uid + '*')
       g = [f.split('-')[1] for f in g]
       g = [int(f) for f in g]
       print(uid, max(g))

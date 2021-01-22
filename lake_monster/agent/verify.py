@@ -1,30 +1,33 @@
 """Log tf graph tensorboard and verify agent."""
 
+import os
 import tensorflow as tf
 from lake_monster.agent.agent import Agent
+from lake_monster import configs
 
 
-# class ModelWrapper(tf.Module):
-#   """Wrap a tf-agent QNetwork as a tf.Module in order to log tf graph."""
+class ModuleWrapper(tf.Module):
+  """Wrap a tf-agent QNetwork as a tf.Module in order to log tf graph."""
 
-#   def __init__(self, net, use_categorical):
-#     super().__init__()
-#     self.net = net
-#     self.use_categorical = use_categorical
+  def __init__(self, net, use_categorical):
+    super().__init__()
+    self.net = net
+    self.use_categorical = use_categorical
 
-#   @tf.function
-#   def __call__(self, x):
-#     if self.use_categorical:
-#       assert len(self.net.layers) == 1
-#       layers = self.net.layers[0].layers
-#     else:
-#       assert len(self.net.layers) == 2
-#       layers = self.net.layers
+  @tf.function
+  def __call__(self, x):
+    if self.use_categorical:
+      assert len(self.net.layers) == 1
+      layers = self.net.layers[0].layers
+    else:
+      assert len(self.net.layers) == 2
+      layers = self.net.layers
 
-#     layers = layers[0].layers + [layers[1]]
-#     for layer in layers:
-#       x = layer(x)
-#     return x
+    layers = layers[0].layers + [layers[1]]
+    for layer in layers:
+      x = layer(x)
+    return x
+
 
 class ModelWrapper(tf.keras.Model):
   """Wrap a tf-agent QNetwork as a tf.Model."""
@@ -54,11 +57,12 @@ def log_graph(uid, params=None, write_logs=True):
     params = {}
   a = Agent(uid, **params)
 
-  model = ModelWrapper(a.q_net.copy(), a.use_categorical)
+  model = ModuleWrapper(a.q_net.copy(), a.use_categorical)
 
   x = a.tf_env.reset().observation  # input to model.__call__
   if write_logs:
-    summary_writer = tf.summary.create_file_writer('logs/' + uid)
+    logdir = os.path.join(configs.LOG_DIR, uid)
+    summary_writer = tf.summary.create_file_writer(logdir)
     summary_writer.set_as_default()
     tf.summary.trace_on()
     model(x)  # ignoring output
