@@ -1,8 +1,6 @@
 """Test the Agent class and log tf graph information."""
 
 import os
-import tensorflow as tf
-from lake_monster.agent.agent import Agent
 from lake_monster.utils import get_random_params
 from lake_monster.agent import verify
 from lake_monster import configs

@@ -185,7 +185,7 @@ def parse_args():
     ARG_DICT[arg]()
 
   elif len(args) == 1:
-    if os.path.exists('agent_id.txt'):
+    if os.path.exists(configs.AGENT_ID_PATH):
       a = restore_existing_agent()
     else:
       a = build_new_agent()

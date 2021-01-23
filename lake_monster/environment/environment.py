@@ -1,5 +1,6 @@
 """A tf-agent environment for the lake monster problem."""
 
+import random
 from dataclasses import dataclass
 import numpy as np
 from tf_agents.environments.py_environment import PyEnvironment
@@ -69,17 +70,23 @@ class LakeMonsterEnvironment(PyEnvironment):
     self._episode_ended = False
 
     if self.use_random_start:
-      self.r = np.random.random()
-      self.monster_angle = 2 * np.pi * (np.random.random() - 0.5)
+      # sometimes start at the origin, sometimes random
+      if random.random() > 0.5:
+        self.r = random.random()
+        self.monster_angle = 2 * np.pi * (random.random() - 0.5)
+      else:
+        self.r = 0.0
+        self.monster_angle = 0.0
+
     else:
       self.r = 0.0
       self.monster_angle = 0.0
 
     if self.use_random_monster_speed:
-      self.monster_speed = 1.5 + 3.0 * np.random.random()
+      self.monster_speed = 1.5 + 3.0 * random.random()
 
-    if self.use_random_step_size:  # between 10^-2.5 and 10^-1
-      e = 1.5 * np.random.random() - 2.5
+    if self.use_random_step_size:  # between 10^-2.5 and 10^-0.5
+      e = 2 * random.random() - 2.5
       self.step_size = 10 ** e
 
     self.n_steps = 0
@@ -87,7 +94,7 @@ class LakeMonsterEnvironment(PyEnvironment):
     self.is_monster_caught_up = False
     self.prev_agent_rotation = 0.0
     self.total_agent_rotation = 0.0
-    self.total_monster_rotation = 0.0
+    self.total_monster_rotation = self.monster_angle
     self.action_vector = None
     return time_step.restart(self._state)
 
@@ -149,7 +156,7 @@ class LakeMonsterEnvironment(PyEnvironment):
     self.action_vector = self.step_size * self.action_to_direction[action]
     position = np.array((self.r, 0)) + self.action_vector
     if position[0] == 0.0:
-      position[0] += np.random.random() * 1e-6  # avoid arctan issues
+      position[0] += random.random() * 1e-6  # avoid arctan issues
 
     self.r = np.linalg.norm(position)
     theta = np.arctan2(position[1], position[0])
@@ -161,6 +168,9 @@ class LakeMonsterEnvironment(PyEnvironment):
     """Helper function for _step method."""
     if self._episode_ended:
       return self.reset()
+
+    if self.r < 1 / self.monster_speed:  # allowing "reset"
+      self.is_monster_caught_up = False
 
     if not self.is_monster_caught_up:
       self.highest_r_attained = max(self.highest_r_attained, self.r)

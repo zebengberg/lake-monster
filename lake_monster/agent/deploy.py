@@ -2,41 +2,45 @@
 
 import os
 import uuid
+import argparse
 from lake_monster import configs, train, utils
 from lake_monster.agent import verify, agent
+
+deploy_params = {
+    # environment params
+    'n_actions': 8,
+    'timeout_factor': 3.0,
+    'use_mini_rewards': True,
+    'use_random_start': True,
+    'use_random_monster_speed': True,
+    'use_random_step_size': True,
+    'use_step_penalty': True,
+
+    # agent params
+    'fc_layer_params': (100, 100),
+    'dropout_layer_params': (0.5, 0.5),
+    'learning_rate': 0.001,
+    'epsilon_greedy': 0.1,
+    'n_step_update': 6,
+    'use_categorical': False,
+    'use_step_schedule': False,
+    'use_mastery': False,
+    'use_evaluation': False
+}
 
 
 def run_train():
   """Run agent train for gh-pages deploy."""
-  uid = str(uuid.uuid1().int)
+  if os.path.exists(configs.AGENT_ID_PATH):
+    a = train.restore_existing_agent()
+  else:
+    uid = str(uuid.uuid1().int)
+    verify.verify_agent(uid, deploy_params)
+    verify.log_graph(uid, deploy_params)
+    utils.log_uid(uid)
+    utils.log_params(uid, deploy_params)
+    a = agent.Agent(uid, **deploy_params)
 
-  params = {
-      # environment params
-      'n_actions': 8,
-      'timeout_factor': 3.0,
-      'use_mini_rewards': True,
-      'use_random_start': True,
-      'use_random_monster_speed': True,
-      'use_random_step_size': True,
-      'use_step_penalty': True,
-
-      # agent params
-      'fc_layer_params': (100, 100),
-      'dropout_layer_params': (0.5, 0.5),
-      'learning_rate': 0.001,
-      'epsilon_greedy': 0.1,
-      'n_step_update': 6,
-      'use_categorical': False,
-      'use_step_schedule': False,
-      'use_mastery': False,
-      'use_evaluation': False
-  }
-
-  verify.verify_agent(uid, params)
-  verify.log_graph(uid, params)
-  utils.log_uid(uid)
-  utils.log_params(uid, params)
-  a = agent.Agent(uid, **params)
   train.launch_tb(a.get_uid())
   a.train_ad_infinitum()
 
@@ -56,8 +60,18 @@ def save_model():
   savepath = os.path.join(configs.TEMP_DIR, 'saved_model')
   model.save(savepath)
   print(f'Model saved to {savepath}')
+  print('#' * 65)
+  print('\n\n')
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--train', action='store_true')
+parser.add_argument('--save', action='store_true')
 
 
 if __name__ == '__main__':
-  run_train()
-  # save_model()
+  args = parser.parse_args()
+  if args.train:
+    run_train()
+  elif args.save:
+    save_model()

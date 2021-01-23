@@ -11,6 +11,7 @@ canvas.height = size;
 canvas.width = size;
 const radius = 0.45 * size;
 const stepSize = 0.02;
+const timeoutFactor = 3.0;
 
 let monsterSpeed = Number(slider.value);
 label.innerText = "monster speed: " + slider.value;
@@ -23,11 +24,18 @@ class Point {
   x: number;
   y: number;
   color: string | null;
+  clicked: boolean | null;
 
-  constructor(x: number, y: number, color: string | null = null) {
+  constructor(
+    x: number,
+    y: number,
+    color: string | null = null,
+    clicked: boolean | null = null
+  ) {
     this.x = x;
     this.y = y;
     this.color = color;
+    this.clicked = clicked;
   }
 
   reset(x: number, y: number) {
@@ -70,6 +78,11 @@ class Point {
       this.x += dx;
       this.y += dy;
     }
+  }
+
+  moveInDirection(direction: Point) {
+    this.x += stepSize * (direction.x / direction.norm);
+    this.y += stepSize * (direction.y / direction.norm);
   }
 
   moveAlongArc(targetAngle: number) {
@@ -163,74 +176,43 @@ function getState(pAgent: Point, pMonster: Point, pPath: Path) {
   return [
     stepSize,
     monsterSpeed,
-    (pPath.path.length * stepSize) / 3.0,
+    ((pPath.path.length - 1) * stepSize) / timeoutFactor,
     pAgent.norm,
     angleDiff(pMonster.angle, pAgent.angle),
   ];
 }
 
-function predToDirection(pred: number[], pAgent: Point) {
-  console.log(pred);
-  let max = pred[0];
+function argmax(arr: number[]) {
+  let max = arr[0];
   let maxIndex = 0;
-  for (let i = 1; i < pred.length; i++) {
-    if (pred[i] > max) {
-      max = pred[i];
+  for (let i = 1; i < arr.length; i++) {
+    if (arr[i] > max) {
+      max = arr[i];
       maxIndex = i;
     }
   }
-  const theta = pAgent.angle + (2 * Math.PI * maxIndex) / pred.length;
-  const target = new Point(Math.cos(theta), Math.sin(theta));
-  console.log(maxIndex, pred.length);
-  console.log(pAgent.angle);
-  console.log(theta);
-  console.log(target);
-  return target;
+  return maxIndex;
 }
 
-function play(
-  pAgent: Point,
-  pMonster: Point,
-  pPath: Path,
-  aiMove: (state: number[]) => Point
-) {
-  drawLake();
-  pAgent.draw();
-  pMonster.draw();
-  if (pathCheckbox.checked) {
-    pPath.draw();
-  }
-  let state = getState(pAgent, pMonster, pPath);
-  console.log("#######################");
-  console.log(agent);
-  console.log(monster);
-  console.log(state);
-
-  if (pAgent.norm >= 1) {
-    gameOver = true;
-    drawWinner(pAgent, pMonster);
-  }
-
-  if (!gameOver) {
-    if (aiCheckbox.checked) {
-      state = getState(pAgent, pMonster, pPath);
-      const target = aiMove(state);
-      pAgent.moveToTarget(target);
-    } else {
-      pAgent.moveToTarget(mouse);
-    }
-    pMonster.moveAlongArc(pAgent.angle);
-    pPath.append(pAgent);
-  }
-  state = getState(pAgent, pMonster, pPath);
-  console.log(state);
+function predToDirection(pred: number[], pAgent: Point) {
+  const maxIndex = argmax(pred);
+  const theta = pAgent.angle + (2 * Math.PI * maxIndex) / pred.length;
+  const direction = new Point(Math.cos(theta), Math.sin(theta));
+  console.log(
+    "target:",
+    Math.round(direction.x * 1000) / 1000,
+    Math.round(direction.y * 1000) / 1000
+  );
+  return direction;
 }
 
 const agent = new Point(0, 0, "red");
 const monster = new Point(1, 0, "lime");
 const mouse = new Point(0, 0);
+const click = new Point(0, 0, null, false);
 const path = new Path(<string>agent.color);
 path.append(agent);
+let gameOver = false;
 
 canvas.addEventListener("mousemove", (e) => {
   const rect = canvas.getBoundingClientRect();
@@ -238,7 +220,13 @@ canvas.addEventListener("mousemove", (e) => {
   mouse.y = -(e.clientY - rect.top - size / 2) / radius;
 });
 
-let gameOver = false;
+canvas.addEventListener("click", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  click.x = (e.clientX - rect.left - size / 2) / radius;
+  click.y = -(e.clientY - rect.top - size / 2) / radius;
+  click.clicked = true;
+});
+
 document.addEventListener("keydown", (e) => {
   if (e.key == " ") {
     if (gameOver) {
@@ -250,21 +238,81 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+function play(
+  pAgent: Point,
+  pMonster: Point,
+  pPath: Path,
+  aiMove: (state: number[]) => Point,
+  printCallback: ((state: number[]) => void) | null = null
+) {
+  drawLake();
+  pAgent.draw();
+  pMonster.draw();
+  if (pathCheckbox.checked) {
+    pPath.draw();
+  }
+  let state = getState(pAgent, pMonster, pPath);
+  if (printCallback !== null) {
+    printCallback(state);
+  }
+
+  if (pAgent.norm >= 1) {
+    gameOver = true;
+    drawWinner(pAgent, pMonster);
+  }
+
+  if (!gameOver) {
+    if (aiCheckbox.checked) {
+      if (click.clicked) {
+        // teleport the agent
+        pAgent.x = click.x;
+        pAgent.y = click.y;
+        click.clicked = false;
+      }
+      state = getState(pAgent, pMonster, pPath);
+      const direction = aiMove(state);
+      pAgent.moveInDirection(direction);
+    } else {
+      pAgent.moveToTarget(mouse);
+    }
+    pMonster.moveAlongArc(pAgent.angle);
+    pPath.append(pAgent);
+  }
+  state = getState(pAgent, pMonster, pPath);
+}
+
 declare const tf: any;
 tf.loadGraphModel("./saved_model/model.json").then((model: any) => {
   const aiMove = (state: number[]) => {
     const x = tf.tensor([state]);
-    let y = model.predict(x);
-    y = y.dataSync();
-    const target = predToDirection(y, agent);
-    return target;
+    let pred = model.predict(x);
+    pred = pred.dataSync();
+    return predToDirection(pred, agent);
   };
 
-  const update = () => play(agent, monster, path, aiMove);
-  // document.addEventListener("keydown", (e) => {
-  //   if (e.key == "a") {
-  //     update();
-  //   }
-  // });
-  setInterval(update, 50);
+  function printStatus(state: number[]) {
+    console.log("#".repeat(65));
+    console.log(
+      "state:",
+      state.map((s) => Math.round(s * 1000) / 1000)
+    );
+    let pred: number[] = model.predict(tf.tensor([state])).dataSync();
+    pred = Array.from(pred); // casting from "TypedArray"
+    const maxIndex = argmax(pred);
+    console.log(
+      "pred:",
+      pred.map((s) => Math.round(s * 1000) / 1000)
+    );
+    console.log("action:", maxIndex);
+  }
+
+  const update = () => play(agent, monster, path, aiMove, printStatus);
+  document.addEventListener("keydown", (e) => {
+    if (e.key == " ") {
+      if (!gameOver) {
+        update();
+      }
+    }
+  });
+  //setInterval(update, 50);
 });
