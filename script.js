@@ -2,24 +2,28 @@
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const slider = document.getElementById("slider");
-const label = document.getElementById("label");
-const checkbox = document.getElementById("checkbox");
+const sliderLabel = document.getElementById("slider-label");
+const cirCheckbox = document.getElementById("cir-checkbox");
+const aiCheckbox = document.getElementById("ai-checkbox");
+const pathCheckbox = document.getElementById("path-checkbox");
+const teleCheckbox = document.getElementById("tele-checkbox");
 const size = Math.min(window.innerWidth, window.innerHeight) - 100;
 canvas.height = size;
 canvas.width = size;
 const radius = 0.45 * size;
-const stepSize = 0.005;
+const stepSize = 0.01;
+const timeoutFactor = 3.0;
 let monsterSpeed = Number(slider.value);
-label.innerText = "monster speed: " + slider.value;
-slider.onchange = () => {
+slider.oninput = () => {
     monsterSpeed = Number(slider.value);
-    label.innerText = "monster speed: " + slider.value;
+    sliderLabel.innerText = "monster speed: " + slider.value;
 };
 class Point {
-    constructor(x, y, color) {
+    constructor(x, y, color = null, clicked = null) {
         this.x = x;
         this.y = y;
         this.color = color;
+        this.clicked = clicked;
     }
     reset(x, y) {
         this.x = x;
@@ -33,7 +37,7 @@ class Point {
     }
     draw() {
         const x = size / 2 + radius * this.x;
-        const y = size / 2 + radius * this.y;
+        const y = size / 2 - radius * this.y;
         const r = 10;
         ctx.beginPath();
         if (this.color !== null) {
@@ -46,7 +50,7 @@ class Point {
     moveToTarget(target) {
         let dx = target.x - this.x;
         let dy = target.y - this.y;
-        const d = new Point(dx, dy, null);
+        const d = new Point(dx, dy);
         if (stepSize > d.norm) {
             this.x = target.x;
             this.y = target.y;
@@ -57,6 +61,10 @@ class Point {
             this.x += dx;
             this.y += dy;
         }
+    }
+    moveInDirection(direction) {
+        this.x += stepSize * (direction.x / direction.norm);
+        this.y += stepSize * (direction.y / direction.norm);
     }
     moveAlongArc(targetAngle) {
         const dAngle = angleDiff(targetAngle, this.angle);
@@ -72,6 +80,32 @@ class Point {
         }
     }
 }
+class Path {
+    constructor(p, color) {
+        // cloning p
+        this.path = [new Point(p.x, p.y)];
+        this.color = color;
+    }
+    append(p) {
+        // cloning p
+        this.path.push(new Point(p.x, p.y));
+    }
+    draw() {
+        if (this.path.length >= 2) {
+            ctx.beginPath();
+            ctx.moveTo(size / 2 + radius * this.path[0].x, size / 2 - radius * this.path[0].y);
+            for (let p of this.path) {
+                ctx.lineTo(size / 2 + radius * p.x, size / 2 - radius * p.y);
+            }
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = this.color;
+            ctx.stroke();
+        }
+    }
+    reset(p) {
+        this.path = [new Point(p.x, p.y)];
+    }
+}
 function drawLake() {
     ctx.clearRect(0, 0, size, size);
     ctx.beginPath();
@@ -79,9 +113,11 @@ function drawLake() {
     ctx.arc(size / 2, size / 2, radius, 0, 2 * Math.PI);
     ctx.closePath();
     ctx.fill();
-    if (checkbox.checked) {
+    if (cirCheckbox.checked) {
         ctx.beginPath();
         ctx.arc(size / 2, size / 2, radius / monsterSpeed, 0, 2 * Math.PI);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "black";
         ctx.stroke();
     }
 }
@@ -95,44 +131,145 @@ function angleDiff(angle1, angle2) {
     }
     return dAngle;
 }
-function determineWinner(p1, p2) {
-    const dAngle = angleDiff(p1.angle, p2.angle);
-    return Math.abs(dAngle) < 0.000001 ? "monster wins!" : "you win!";
+function drawWinner(pAgent, pMonster, tooSlow = false) {
+    let winner;
+    if (tooSlow) {
+        winner = "too slow!";
+    }
+    else {
+        const dAngle = angleDiff(pAgent.angle, pMonster.angle);
+        winner = Math.abs(dAngle) < 0.000001 ? "monster wins!" : "you win!";
+    }
+    ctx.font = "small-caps bold 24px arial";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "white";
+    ctx.fillText(winner, size / 2, size / 2 - 15);
+    ctx.fillText("press r to restart", size / 2, size / 2 + 15);
+}
+function getState(pAgent, pMonster, pPath) {
+    return [
+        stepSize,
+        monsterSpeed,
+        ((pPath.path.length - 1) * stepSize) / timeoutFactor,
+        pAgent.norm,
+        angleDiff(pMonster.angle, pAgent.angle),
+    ];
+}
+function argmax(arr) {
+    let max = arr[0];
+    let maxIndex = 0;
+    for (let i = 1; i < arr.length; i++) {
+        if (arr[i] > max) {
+            max = arr[i];
+            maxIndex = i;
+        }
+    }
+    return maxIndex;
+}
+function predToDirection(pred, pAgent) {
+    const maxIndex = argmax(pred);
+    const theta = pAgent.angle + (2 * Math.PI * maxIndex) / pred.length;
+    return new Point(Math.cos(theta), Math.sin(theta));
 }
 const agent = new Point(0, 0, "red");
 const monster = new Point(1, 0, "lime");
-const mouse = new Point(0, 0, null);
+const mouse = new Point(0, 0);
+const click = new Point(0, 0, null, false);
+const path = new Path(agent, agent.color);
+path.append(agent);
+let gameOver = false;
 canvas.addEventListener("mousemove", (e) => {
     const rect = canvas.getBoundingClientRect();
     mouse.x = (e.clientX - rect.left - size / 2) / radius;
-    mouse.y = (e.clientY - rect.top - size / 2) / radius;
+    mouse.y = -(e.clientY - rect.top - size / 2) / radius;
 });
-let gameOver = false;
+canvas.addEventListener("click", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    click.x = (e.clientX - rect.left - size / 2) / radius;
+    click.y = -(e.clientY - rect.top - size / 2) / radius;
+    click.clicked = true;
+});
 document.addEventListener("keydown", (e) => {
-    if (e.key == " ") {
+    if (["r", "R"].includes(e.key)) {
         if (gameOver) {
-            agent.reset(0, 0);
+            // including a small amount of noise for agent
+            agent.reset((Math.random() - 0.5) / 100, (Math.random() - 0.5) / 100);
             monster.reset(1, 0);
+            path.reset(agent);
             gameOver = false;
         }
     }
 });
-function run() {
+function play(pAgent, pMonster, pPath, aiMove, printCallback = null) {
     drawLake();
-    agent.draw();
-    monster.draw();
-    if (agent.norm > 1) {
+    pAgent.draw();
+    pMonster.draw();
+    if (pathCheckbox.checked) {
+        pPath.draw();
+    }
+    let state = getState(pAgent, pMonster, pPath);
+    if (printCallback !== null) {
+        printCallback(state);
+    }
+    // ending the game
+    if (pAgent.norm >= 1) {
         gameOver = true;
-        const winner = determineWinner(agent, monster);
-        ctx.font = "small-caps bold 24px arial";
-        ctx.textAlign = "center";
-        ctx.fillStyle = "white";
-        ctx.fillText(winner, size / 2, size / 2 - 15);
-        ctx.fillText("press space to restart", size / 2, size / 2 + 15);
+        drawWinner(pAgent, pMonster);
+    }
+    // stopping the game if it's been running for too long
+    if (aiCheckbox.checked) {
+        if (pPath.path.length > timeoutFactor / stepSize + 2) {
+            gameOver = true;
+            drawWinner(pAgent, pMonster, true);
+        }
     }
     if (!gameOver) {
-        agent.moveToTarget(mouse);
-        monster.moveAlongArc(agent.angle);
+        if (teleCheckbox.checked) {
+            if (click.clicked) {
+                pAgent.x = click.x;
+                pAgent.y = click.y;
+                click.clicked = false;
+            }
+        }
+        if (aiCheckbox.checked) {
+            // moving the agent with the aiMove function
+            state = getState(pAgent, pMonster, pPath);
+            const direction = aiMove(state);
+            pAgent.moveInDirection(direction);
+        }
+        else {
+            // moving according to human mouse
+            pAgent.moveToTarget(mouse);
+        }
+        // updating the monster and the path
+        pMonster.moveAlongArc(pAgent.angle);
+        pPath.append(pAgent);
     }
+    state = getState(pAgent, pMonster, pPath);
 }
-setInterval(run, 50);
+tf.loadGraphModel("./saved_model/model.json").then((model) => {
+    const aiMove = (state) => {
+        const x = tf.tensor([state]);
+        let pred = model.predict(x);
+        pred = pred.dataSync();
+        return predToDirection(pred, agent);
+    };
+    function printStatus(state) {
+        console.log("#".repeat(65));
+        console.log("state:", state.map((s) => Math.round(s * 1000) / 1000));
+        let pred = model.predict(tf.tensor([state])).dataSync();
+        pred = Array.from(pred); // casting from "TypedArray"
+        const maxIndex = argmax(pred);
+        console.log("pred:", pred.map((s) => Math.round(s * 1000) / 1000));
+        console.log("action:", maxIndex);
+    }
+    const update = () => play(agent, monster, path, aiMove, null);
+    // document.addEventListener("keydown", (e) => {
+    //   if (e.key == " ") {
+    //     if (!gameOver) {
+    //       update();
+    //     }
+    //   }
+    // });
+    setInterval(update, 50);
+});
