@@ -1,6 +1,6 @@
 # lake-monster
 
-> Use reinforcement learning to solve the lake monster problem.
+> Use reinforcement learning to solve the lake monster problem. Check out [a trained agent](https://zebengberg.github.io/lake-monster/) deployed through TensorFlow.js.
 
 - [Introduction](#introduction)
 - [Installation and Usage](#installation-and-usage)
@@ -28,19 +28,24 @@ The lake-monster problem is readily adaptable to the RL framework. Specifically,
 
 ### Installation
 
-This simulation was created with Python 3.8 using TensorFlow and TF-Agents.
-
-You can clone or download this repository locally. You may want to create a new Python environment to install the dependencies using an environment manager such as `conda`.
+This simulation was created with Python 3.8 using TensorFlow and TF-Agents. You may want to create a new Python environment to install the dependencies using an environment manager such as `conda`.
 
 ```sh
 conda create --name monster python=3.8
 conda activate monster
-pip install -r requirements.txt
+```
+
+You can clone or download this repository locally, then install with `pip`.
+
+```sh
+git clone https://github.com/zebengberg/lake-monster
+cd lake-monster
+pip install .
 ```
 
 ### Tests
 
-Test the lake-monster environment by running `python test_environment.py`. This script initializes a random policy to interact with `LakeMonsterEnvironment` (see [Environment](#environment-and-agent)) and creates a sample video showing an episode. Test the TensorFlow-derived DQN-based agent framework by running `python test_agent.py`. This script instantiates several `Agent` objects, prints out network statistics, and runs a few episodes using the TF-Agents `DynamicEpisodeDriver` pipeline.
+With `pytest` installed, run the tests simply by calling `pytest` in the root directory of this project. The `test_environment` module can be used to create random policies to interact with `LakeMonsterEnvironment` (see [Environment](#environment-and-agent)). The TensorFlow-derived DQN-based agent framework is tested in the `test_agent` module. This can be used to instantiate `Agent` objects, print out network statistics, and run episodes using the TF-Agents `DynamicEpisodeDriver` pipeline.
 
 |                ![random policy](assets/random.gif)                |
 | :---------------------------------------------------------------: |
@@ -48,7 +53,7 @@ Test the lake-monster environment by running `python test_environment.py`. This 
 
 ### Usage
 
-After testing the environment and agent classes, you can train your very own agent to try to solve the lake-monster problem by running `python train.py`. Default parameters are strong, and can be modified in the source code. Additional options can be viewed by running `python train.py --help`.
+After testing the environment and agent classes, you can train your very own agent to try to solve the lake-monster problem by running `python lake_monster`. Default parameters are strong, and can be modified in the source code. Additional options can be viewed by running `python lake_monster --help`.
 
 ```sh
 Usage: python train.py [arg]
@@ -155,7 +160,7 @@ Suppose that the agent runs antipodally away from the monster. The monster trave
 
 Because this strategy is so simple, it can be considered a baseline minimum for what the agent should aspire to achieve. In other words, the agent has learned something nontrivial if it can escape from a monster with a speed of at least pi. Due to the discrete nature of the environment (specifically, the discrete variables `step_size` and `n_actions`), the agent would not be able to enact this exact strategy in the continuous environment. Nevertheless, we still consider a monster speed of pi as a prerequisite for an intelligent agent.
 
-With no knowledge of the mathematics, it is possible for a human to quickly learn to escape from a monster with speed pi. For example, the function `test_movement` in [`test_environment.py`](test_environment.py) uses simple handcrafted actions to succeed against a monster with speed 3.5. In the lake-monster problem, most humans could eventually fine-tune a set of actions to succeed against a monster with speeds between pi and 4.0. An agent can be described as having _human-level intelligence_ if it can succeed against monsters with speeds up to 4.0. An agent that can escape from a monster with speeds above 4.0 is considered to have _superintelligence_.
+With no knowledge of the mathematics, it is possible for a human to quickly learn to escape from a monster with speed pi. For example, the function `test_movement` in [`test_environment.py`](test_environment.py) uses simple handcrafted actions to succeed against a monster with speed 3.5. In the lake-monster problem, most humans could eventually fine-tune a set of actions to succeed against a monster with speeds between pi and 4.3. An agent can be described as having _human-level intelligence_ if it can succeed against monsters with speeds up to 4.3. An agent that can escape from a monster with speeds above 4.3 is considered to have _superintelligence_.
 
 The [optimal mathematical solution](http://datagenetics.com/blog/october12013/index.html) allows an agent to escape a monster with a speed of 4.603..., and so no agent will actually perform better than a handcrafted agent created by a human expert (a mathematician).
 

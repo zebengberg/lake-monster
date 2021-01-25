@@ -9,20 +9,21 @@ from lake_monster.agent import verify, agent
 deploy_params = {
     # environment params
     'n_actions': 8,
+    'initial_step_size': 0.1,
+    'min_step_size': 0.01,
     'timeout_factor': 3.0,
     'use_mini_rewards': True,
     'use_random_start': True,
     'use_random_monster_speed': True,
-    'use_random_step_size': True,
 
     # agent params
     'fc_layer_params': (100, 100),
     'dropout_layer_params': (0.1, 0.1),
-    'learning_rate': 0.002,
+    'learning_rate': 0.001,
     'epsilon_greedy': 0.1,
     'n_step_update': 6,
     'use_categorical': False,
-    'use_step_schedule': False,
+    'use_step_schedule': True,
     'use_mastery': False,
     'use_evaluation': False
 }

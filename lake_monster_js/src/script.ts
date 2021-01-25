@@ -230,7 +230,7 @@ canvas.addEventListener("click", (e) => {
 document.addEventListener("keydown", (e) => {
   if (["r", "R"].includes(e.key)) {
     if (gameOver) {
-      // including a small amount of noise for agent
+      // including a small amount of noise to allow agent to variable behavior
       agent.reset((Math.random() - 0.5) / 100, (Math.random() - 0.5) / 100);
       monster.reset(1, 0);
       path.reset(agent);
@@ -257,9 +257,17 @@ function play(
     printCallback(state);
   }
 
+  // ending the game
   if (pAgent.norm >= 1) {
     gameOver = true;
     drawWinner(pAgent, pMonster);
+  }
+  // stopping the game if it's been running for too long
+  if (aiCheckbox.checked) {
+    if (pPath.path.length > timeoutFactor / stepSize + 2) {
+      gameOver = true;
+      drawWinner(pAgent, pMonster, true);
+    }
   }
 
   if (!gameOver) {
@@ -270,13 +278,7 @@ function play(
         click.clicked = false;
       }
     }
-
     if (aiCheckbox.checked) {
-      // stopping the game if it's been running for too long
-      if (pPath.path.length > timeoutFactor / stepSize + 2) {
-        gameOver = true;
-        drawWinner(pAgent, pMonster, true);
-      }
       // moving the agent with the aiMove function
       state = getState(pAgent, pMonster, pPath);
       const direction = aiMove(state);
@@ -318,13 +320,13 @@ tf.loadGraphModel("./saved_model/model.json").then((model: any) => {
     console.log("action:", maxIndex);
   }
 
-  const update = () => play(agent, monster, path, aiMove, printStatus);
-  document.addEventListener("keydown", (e) => {
-    if (e.key == " ") {
-      if (!gameOver) {
-        update();
-      }
-    }
-  });
-  // setInterval(update, 50);
+  const update = () => play(agent, monster, path, aiMove, null);
+  // document.addEventListener("keydown", (e) => {
+  //   if (e.key == " ") {
+  //     if (!gameOver) {
+  //       update();
+  //     }
+  //   }
+  // });
+  setInterval(update, 50);
 });

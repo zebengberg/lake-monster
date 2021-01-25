@@ -2,8 +2,6 @@
 
 import os
 import glob
-import warnings
-import absl
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
@@ -19,8 +17,6 @@ from lake_monster import configs
 
 
 # suppressing some annoying warnings
-warnings.filterwarnings('ignore', category=UserWarning)
-absl.logging.set_verbosity(absl.logging.ERROR)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 

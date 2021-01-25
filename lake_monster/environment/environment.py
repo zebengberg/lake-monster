@@ -22,11 +22,10 @@ class LakeMonsterEnvironment(PyEnvironment):
   n_actions: int = 8
   use_mini_rewards: bool = True
   use_random_start: bool = False
-  use_random_step_size: bool = False
   use_random_monster_speed: bool = False
 
   def __post_init__(self):
-    # super().__init__()
+    super().__init__()
 
     # building the action_to_direction list
     def to_vector(action):
@@ -69,24 +68,19 @@ class LakeMonsterEnvironment(PyEnvironment):
     self._episode_ended = False
 
     if self.use_random_start:
-      # sometimes start at the origin, sometimes random
+      # sometimes start near the origin, sometimes completely random
+      self.monster_angle = 2 * np.pi * (random.random() - 0.5)
       if random.random() > 0.5:
         self.r = random.random()
-        self.monster_angle = 2 * np.pi * (random.random() - 0.5)
       else:
-        self.r = 0.0
-        self.monster_angle = 0.0
+        self.r = random.random() / 2000
 
     else:
       self.r = 0.0
       self.monster_angle = 0.0
 
-    if self.use_random_monster_speed:
+    if self.use_random_monster_speed:  # monster speed between 2.5 and 4.5
       self.monster_speed = 2.5 + 2.0 * random.random()
-
-    if self.use_random_step_size:  # between 10^-1.5 and 10^-0.5
-      e = random.random() - 1.5
-      self.step_size = 10 ** e
 
     self.n_steps = 0
     self.highest_r_attained = 0.0

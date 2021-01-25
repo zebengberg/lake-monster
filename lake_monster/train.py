@@ -2,6 +2,7 @@
 
 import sys
 import os
+import shutil
 import glob
 import uuid
 import webbrowser
@@ -73,9 +74,9 @@ def clear_all_knowledge():
     if os.path.exists(p := configs.RESULTS_PATH):
       os.remove(p)
     for f in glob.glob(configs.LOG_DIR + '/*'):
-      os.remove(f)
+      shutil.rmtree(f)
     for f in glob.glob(configs.POLICY_DIR + '/*'):
-      os.remove(f)
+      shutil.rmtree(f)
 
 
 def confirm_new():

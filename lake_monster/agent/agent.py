@@ -4,8 +4,6 @@ from __future__ import annotations
 import os
 from typing import Callable
 from dataclasses import dataclass
-import warnings
-import absl.logging
 import tensorflow as tf
 from tf_agents.agents.dqn.dqn_agent import DqnAgent
 from tf_agents.agents.categorical_dqn.categorical_dqn_agent import CategoricalDqnAgent
@@ -24,8 +22,6 @@ from lake_monster import configs
 
 
 # suppressing some annoying warnings
-warnings.filterwarnings('ignore', category=UserWarning)
-absl.logging.set_verbosity(absl.logging.ERROR)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
@@ -61,10 +57,12 @@ class Agent:
   """A class to hold global variables for tf_agent training."""
 
   uid: str
+  use_checkpointer: bool = True
   replay_buffer_max_length: int = 1_000_000
   batch_size: int = 64
   n_actions: int = 16
   initial_step_size: float = 0.1
+  min_step_size: float | None = None
   initial_monster_speed: float = 4.0
   timeout_factor: float = 2.0
   use_mini_rewards: bool = True
@@ -79,7 +77,6 @@ class Agent:
   summative_callback: Callable[[], bool] | None = None
   use_random_start: bool = False
   use_random_monster_speed: bool = False
-  use_random_step_size: bool = False
   use_evaluation: bool = True
 
   def __post_init__(self):
@@ -105,8 +102,9 @@ class Agent:
       self.q_net, self.agent = self.build_dqn_agent()
     self.replay_buffer = self.build_replay_buffer()
 
-    self.checkpointer = self.build_checkpointer()
-    self.checkpointer.initialize_or_restore()
+    if self.use_checkpointer:
+      self.checkpointer = self.build_checkpointer()
+      self.checkpointer.initialize_or_restore()
 
     # defining other training items dependent on checkpointer parameters
     self.py_env, self.tf_env = self.build_env()
@@ -125,8 +123,7 @@ class Agent:
             'n_actions': self.n_actions,
             'use_mini_rewards': self.use_mini_rewards,
             'use_random_start': self.use_random_start,
-            'use_random_monster_speed': False,
-            'use_random_step_size': False}
+            'use_random_monster_speed': False}
 
   def reset(self):
     """Reset member variables after updating monster_speed."""
@@ -295,6 +292,8 @@ class Agent:
     if step % 100_000 == 0:
       print('Decreasing the step size according to the schedule.')
       self.step_size.assign(tf.multiply(0.7, self.step_size))
+      if self.step_size < self.min_step_size:
+        self.step_size.assign(self.min_step_size)
       self.reset()
 
   def run_formative(self, step):
@@ -390,9 +389,6 @@ class MultiMonsterAgent(Agent):
 
 class JumpingAgent(Agent):
   """A DQN agent for the JumpingEnvironment."""
-
-  def __init__(self, uid, **kwargs):
-    super().__init__(uid, **kwargs)
 
   @ property
   def env_params(self):
