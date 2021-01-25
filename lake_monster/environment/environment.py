@@ -24,7 +24,6 @@ class LakeMonsterEnvironment(PyEnvironment):
   use_random_start: bool = False
   use_random_step_size: bool = False
   use_random_monster_speed: bool = False
-  use_step_penalty: bool = False
 
   def __post_init__(self):
     # super().__init__()
@@ -83,10 +82,10 @@ class LakeMonsterEnvironment(PyEnvironment):
       self.monster_angle = 0.0
 
     if self.use_random_monster_speed:
-      self.monster_speed = 1.5 + 3.0 * random.random()
+      self.monster_speed = 2.5 + 2.0 * random.random()
 
-    if self.use_random_step_size:  # between 10^-2.5 and 10^-0.5
-      e = 2 * random.random() - 2.5
+    if self.use_random_step_size:  # between 10^-1.5 and 10^-0.5
+      e = random.random() - 1.5
       self.step_size = 10 ** e
 
     self.n_steps = 0
@@ -184,8 +183,6 @@ class LakeMonsterEnvironment(PyEnvironment):
       return time_step.termination(self._state, reward=reward)
 
     # still swimming
-    if self.use_step_penalty:
-      return time_step.transition(self._state, reward=-0.001)
     return time_step.transition(self._state, reward=0)
 
   def _step(self, action):

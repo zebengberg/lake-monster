@@ -80,7 +80,6 @@ class Agent:
   use_random_start: bool = False
   use_random_monster_speed: bool = False
   use_random_step_size: bool = False
-  use_step_penalty: bool = False
   use_evaluation: bool = True
 
   def __post_init__(self):
@@ -127,8 +126,7 @@ class Agent:
             'use_mini_rewards': self.use_mini_rewards,
             'use_random_start': self.use_random_start,
             'use_random_monster_speed': False,
-            'use_random_step_size': False,
-            'use_step_penalty': False}
+            'use_random_step_size': False}
 
   def reset(self):
     """Reset member variables after updating monster_speed."""

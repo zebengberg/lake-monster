@@ -14,12 +14,11 @@ deploy_params = {
     'use_random_start': True,
     'use_random_monster_speed': True,
     'use_random_step_size': True,
-    'use_step_penalty': True,
 
     # agent params
     'fc_layer_params': (100, 100),
-    'dropout_layer_params': (0.5, 0.5),
-    'learning_rate': 0.001,
+    'dropout_layer_params': (0.1, 0.1),
+    'learning_rate': 0.002,
     'epsilon_greedy': 0.1,
     'n_step_update': 6,
     'use_categorical': False,

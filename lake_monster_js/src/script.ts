@@ -1,23 +1,24 @@
 const canvas = <HTMLCanvasElement>document.getElementById("canvas");
 const ctx = <CanvasRenderingContext2D>canvas.getContext("2d");
 const slider = <HTMLInputElement>document.getElementById("slider");
-const label = <HTMLLabelElement>document.getElementById("label");
+const sliderLabel = <HTMLLabelElement>document.getElementById("slider-label");
 const cirCheckbox = <HTMLInputElement>document.getElementById("cir-checkbox");
 const aiCheckbox = <HTMLInputElement>document.getElementById("ai-checkbox");
 const pathCheckbox = <HTMLInputElement>document.getElementById("path-checkbox");
+const teleCheckbox = <HTMLInputElement>document.getElementById("tele-checkbox");
 
 const size = Math.min(window.innerWidth, window.innerHeight) - 100;
 canvas.height = size;
 canvas.width = size;
 const radius = 0.45 * size;
-const stepSize = 0.02;
+const stepSize = 0.01;
 const timeoutFactor = 3.0;
 
 let monsterSpeed = Number(slider.value);
-label.innerText = "monster speed: " + slider.value;
+
 slider.oninput = () => {
   monsterSpeed = Number(slider.value);
-  label.innerText = "monster speed: " + slider.value;
+  sliderLabel.innerText = "monster speed: " + slider.value;
 };
 
 class Point {
@@ -103,15 +104,15 @@ class Path {
   path: Point[];
   color: string;
 
-  constructor(color: string) {
-    this.path = [];
+  constructor(p: Point, color: string) {
+    // cloning p
+    this.path = [new Point(p.x, p.y)];
     this.color = color;
   }
 
   append(p: Point) {
     // cloning p
-    const [x, y] = [p.x, p.y];
-    this.path.push(new Point(x, y));
+    this.path.push(new Point(p.x, p.y));
   }
 
   draw() {
@@ -130,8 +131,8 @@ class Path {
     }
   }
 
-  reset() {
-    this.path = [];
+  reset(p: Point) {
+    this.path = [new Point(p.x, p.y)];
   }
 }
 
@@ -162,14 +163,19 @@ function angleDiff(angle1: number, angle2: number) {
   return dAngle;
 }
 
-function drawWinner(pAgent: Point, pMonster: Point) {
-  const dAngle = angleDiff(pAgent.angle, pMonster.angle);
-  const winner = Math.abs(dAngle) < 0.000001 ? "monster wins!" : "you win!";
+function drawWinner(pAgent: Point, pMonster: Point, tooSlow: boolean = false) {
+  let winner;
+  if (tooSlow) {
+    winner = "too slow!";
+  } else {
+    const dAngle = angleDiff(pAgent.angle, pMonster.angle);
+    winner = Math.abs(dAngle) < 0.000001 ? "monster wins!" : "you win!";
+  }
   ctx.font = "small-caps bold 24px arial";
   ctx.textAlign = "center";
   ctx.fillStyle = "white";
   ctx.fillText(winner, size / 2, size / 2 - 15);
-  ctx.fillText("press space to restart", size / 2, size / 2 + 15);
+  ctx.fillText("press r to restart", size / 2, size / 2 + 15);
 }
 
 function getState(pAgent: Point, pMonster: Point, pPath: Path) {
@@ -197,20 +203,14 @@ function argmax(arr: number[]) {
 function predToDirection(pred: number[], pAgent: Point) {
   const maxIndex = argmax(pred);
   const theta = pAgent.angle + (2 * Math.PI * maxIndex) / pred.length;
-  const direction = new Point(Math.cos(theta), Math.sin(theta));
-  console.log(
-    "target:",
-    Math.round(direction.x * 1000) / 1000,
-    Math.round(direction.y * 1000) / 1000
-  );
-  return direction;
+  return new Point(Math.cos(theta), Math.sin(theta));
 }
 
 const agent = new Point(0, 0, "red");
 const monster = new Point(1, 0, "lime");
 const mouse = new Point(0, 0);
 const click = new Point(0, 0, null, false);
-const path = new Path(<string>agent.color);
+const path = new Path(agent, <string>agent.color);
 path.append(agent);
 let gameOver = false;
 
@@ -228,11 +228,12 @@ canvas.addEventListener("click", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if (e.key == " ") {
+  if (["r", "R"].includes(e.key)) {
     if (gameOver) {
-      agent.reset(0, 0);
+      // including a small amount of noise for agent
+      agent.reset((Math.random() - 0.5) / 100, (Math.random() - 0.5) / 100);
       monster.reset(1, 0);
-      path.reset();
+      path.reset(agent);
       gameOver = false;
     }
   }
@@ -262,19 +263,30 @@ function play(
   }
 
   if (!gameOver) {
-    if (aiCheckbox.checked) {
+    if (teleCheckbox.checked) {
       if (click.clicked) {
-        // teleport the agent
         pAgent.x = click.x;
         pAgent.y = click.y;
         click.clicked = false;
       }
+    }
+
+    if (aiCheckbox.checked) {
+      // stopping the game if it's been running for too long
+      if (pPath.path.length > timeoutFactor / stepSize + 2) {
+        gameOver = true;
+        drawWinner(pAgent, pMonster, true);
+      }
+      // moving the agent with the aiMove function
       state = getState(pAgent, pMonster, pPath);
       const direction = aiMove(state);
       pAgent.moveInDirection(direction);
     } else {
+      // moving according to human mouse
       pAgent.moveToTarget(mouse);
     }
+
+    // updating the monster and the path
     pMonster.moveAlongArc(pAgent.angle);
     pPath.append(pAgent);
   }
@@ -314,5 +326,5 @@ tf.loadGraphModel("./saved_model/model.json").then((model: any) => {
       }
     }
   });
-  //setInterval(update, 50);
+  // setInterval(update, 50);
 });

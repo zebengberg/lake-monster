@@ -10,12 +10,25 @@
   <body>
     <h1>lake monster</h1>
     <div>
-      <input type="checkbox" id="cir-checkbox" />
-      <label>show circle</label>
-      <input type="checkbox" id="ai-checkbox" />
-      <label>ai control</label>
-      <input type="checkbox" id="path-checkbox" />
-      <label>show path</label>
+      <input class="checkbox" id="ai-checkbox" type="checkbox" />
+      <label for="ai-checkbox" class="checkbox-label">
+        <span>AI control</span>
+      </label>
+
+      <input class="checkbox" id="cir-checkbox" type="checkbox" />
+      <label for="cir-checkbox" class="checkbox-label">
+        <span>show circle</span>
+      </label>
+
+      <input class="checkbox" id="path-checkbox" type="checkbox" />
+      <label for="path-checkbox" class="checkbox-label">
+        <span>show path</span>
+      </label>
+
+      <input class="checkbox" id="tele-checkbox" type="checkbox" />
+      <label for="teleport-checkbox" class="checkbox-label">
+        <span>enable teleport</span>
+      </label>
     </div>
 
     <div>
@@ -26,8 +39,11 @@
         min="0.5"
         max="5.0"
         step="0.01"
+        value="3.5"
       />
-      <label id="label" for="slider"></label>
+      <label for="slider">
+        <span id="slider-label">monster speed: 3.5</span>
+      </label>
     </div>
 
     <canvas id="canvas"></canvas>

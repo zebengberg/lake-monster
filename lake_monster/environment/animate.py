@@ -129,7 +129,7 @@ def create_many_policy_gif(uid, file_path, monster_speed=4.0):
   n_steps = 300  # = timeout_factor / step_size
   step_size = 0.01
   fps = 10
-  p_paths = glob.glob(configs.POLICIES_DIR + uid + '*')
+  p_paths = glob.glob(configs.POLICY_DIR + uid + '*')
 
   all_positions = []
   colors = []
@@ -182,7 +182,7 @@ def explore_policies():
            '198118059822011761597806885923646036845-88000',
            '207187742707064940724130546035145792365-186000']
 
-  paths = [os.path.join(configs.POLICIES_DIR, p) for p in paths]
+  paths = [os.path.join(configs.POLICY_DIR, p) for p in paths]
   for i, p_path in enumerate(paths):
     if os.path.exists(p_path):
       policy = tf.saved_model.load(p_path)
@@ -212,7 +212,7 @@ def create_assets():
   create_many_policy_gif(uid, file_path, 2.5)
   explore_policies()
 
-  p_path = os.path.join(configs.POLICIES_DIR,
+  p_path = os.path.join(configs.POLICY_DIR,
                         '65601302196810597370436998403635834824-12000')
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
@@ -222,7 +222,7 @@ def create_assets():
     print('Creating ' + save_path)
     episode_as_gif(py_env, policy, save_path)
 
-  p_path = os.path.join(configs.POLICIES_DIR,
+  p_path = os.path.join(configs.POLICY_DIR,
                         '87497411048514251456633633962304499656-83200')
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
@@ -231,7 +231,7 @@ def create_assets():
     print('Creating ' + save_path)
     episode_as_gif(py_env, policy, save_path)
 
-  p_path = os.path.join(configs.POLICIES_DIR,
+  p_path = os.path.join(configs.POLICY_DIR,
                         '87497411048514251456633633962304499656-172100')
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
@@ -240,7 +240,7 @@ def create_assets():
     print('Creating ' + save_path)
     episode_as_gif(py_env, policy, save_path)
 
-  p_path = os.path.join(configs.POLICIES_DIR,
+  p_path = os.path.join(configs.POLICY_DIR,
                         '28000982797640512868211384605769524580-510000')
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
@@ -267,7 +267,7 @@ def create_assets():
     print('Creating ' + save_path)
     episode_as_gif(py_env, policy, save_path)
 
-  p_path = os.path.join(configs.POLICIES_DIR,
+  p_path = os.path.join(configs.POLICY_DIR,
                         '87497411048514251456633633962304499656-136600')
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
@@ -276,7 +276,7 @@ def create_assets():
     print('Creating ' + save_path)
     episode_as_gif(py_env, policy, save_path)
 
-  p_path = os.path.join(configs.POLICIES_DIR,
+  p_path = os.path.join(configs.POLICY_DIR,
                         '36716354962105796536622825194778333824-350000')
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
@@ -291,7 +291,7 @@ def create_assets():
       print('Creating ' + save_path)
       episode_as_gif(py_env, policy, save_path)
 
-  p_path = glob.glob(configs.POLICIES_DIR + '/multi_policies/*-450000')[0]
+  p_path = glob.glob(configs.POLICY_DIR + '/multi_policies/*-450000')[0]
   if os.path.exists(p_path):
     policy = tf.saved_model.load(p_path)
     env_params = policy.get_metadata()
