@@ -192,7 +192,7 @@ canvas.addEventListener("click", (e) => {
 document.addEventListener("keydown", (e) => {
     if (["r", "R"].includes(e.key)) {
         if (gameOver) {
-            // including a small amount of noise for agent
+            // including a small amount of noise to allow agent to variable behavior
             agent.reset((Math.random() - 0.5) / 100, (Math.random() - 0.5) / 100);
             monster.reset(1, 0);
             path.reset(agent);
